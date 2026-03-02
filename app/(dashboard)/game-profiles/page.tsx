@@ -1,5 +1,6 @@
 import { AccessLevel, GameObjectType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,16 @@ import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAccount } from "@/lib/auth";
 import { getProfileCountersByObjectType, goldFromPrice } from "@/lib/business";
+import { formatDateTimeRu } from "@/lib/formatting";
+import { buildProfileHref } from "@/lib/profile-slug";
 import { prisma } from "@/lib/prisma";
 import { getTabAccessForRole, isAccessAllowed, requireTabAccess } from "@/lib/rbac";
+
+const objectTypeLabel: Record<GameObjectType, string> = {
+  ITEM: "Предмет",
+  ACHIEVEMENT: "Достижение",
+  GEAR: "Экипировка",
+};
 
 async function createGameObjectAction(formData: FormData): Promise<void> {
   "use server";
@@ -168,9 +177,9 @@ export default async function GameProfilesPage({
   return (
     <div className="space-y-6">
       <header className="space-y-3">
-        <h1 className="page-title">Game Profiles</h1>
+        <h1 className="page-title">Игровые профили</h1>
         <p className="text-sm text-slate-600">
-          Fast Mode для мастеров: поиск по герою, добавление лута/достижений и авто-расчет золота.
+          Быстрый режим для мастеров: поиск по герою, добавление лута/достижений и авто-расчет золота.
         </p>
         <form className="max-w-xl" action="/game-profiles" method="get">
           <Label htmlFor="q">Поиск героя</Label>
@@ -183,7 +192,7 @@ export default async function GameProfilesPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Fast Mode</CardTitle>
+          <CardTitle className="text-base">Быстрый режим мастера</CardTitle>
         </CardHeader>
         <CardContent>
           {canWrite ? (
@@ -205,7 +214,7 @@ export default async function GameProfilesPage({
                   <option value="">Выберите объект</option>
                   {gameObjects.map((object) => (
                     <option key={object.id} value={object.id}>
-                      {object.name} [{object.objectType}] цена {object.price}
+                      {object.name} [{objectTypeLabel[object.objectType]}] цена {object.price}
                     </option>
                   ))}
                 </Select>
@@ -229,7 +238,7 @@ export default async function GameProfilesPage({
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Игровые профили</CardTitle>
+            <CardTitle className="text-base">Профили героев</CardTitle>
           </CardHeader>
           <CardContent>
             {canWrite ? (
@@ -256,14 +265,21 @@ export default async function GameProfilesPage({
                   <TH>Герой</TH>
                   <TH>Участник</TH>
                   <TH>Параметры</TH>
-                  {canWrite ? <TH>Level</TH> : null}
+                  {canWrite ? <TH>Уровень</TH> : null}
                 </tr>
               </THead>
               <TBody>
                 {profiles.map((profile) => (
                   <tr key={profile.id}>
                     <TD>{profile.heroName}</TD>
-                    <TD>{profile.participant.fullName}</TD>
+                    <TD>
+                      <Link
+                        href={buildProfileHref("participant", profile.participantId)}
+                        className="font-medium underline"
+                      >
+                        {profile.participant.fullName}
+                      </Link>
+                    </TD>
                     <TD>
                       <div className="flex flex-wrap gap-2">
                         <Badge>Loot: {profile.loot}</Badge>
@@ -298,9 +314,9 @@ export default async function GameProfilesPage({
               <form action={createGameObjectAction} className="grid gap-2 md:grid-cols-2">
                 <Input name="name" placeholder="Название объекта" required />
                 <Select name="objectType" defaultValue="ITEM">
-                  <option value="ITEM">ITEM</option>
-                  <option value="ACHIEVEMENT">ACHIEVEMENT</option>
-                  <option value="GEAR">GEAR</option>
+                  <option value="ITEM">Предмет</option>
+                  <option value="ACHIEVEMENT">Достижение</option>
+                  <option value="GEAR">Экипировка</option>
                 </Select>
                 <Input name="price" type="number" min={0} placeholder="Цена" required />
                 <Textarea name="parameters" placeholder="Параметры" />
@@ -323,7 +339,7 @@ export default async function GameProfilesPage({
                 {gameObjects.map((object) => (
                   <tr key={object.id}>
                     <TD>{object.name}</TD>
-                    <TD>{object.objectType}</TD>
+                    <TD>{objectTypeLabel[object.objectType]}</TD>
                     <TD>{object.price}</TD>
                     <TD>{object.parameters ?? "—"}</TD>
                   </tr>
@@ -336,7 +352,7 @@ export default async function GameProfilesPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Последние изменения Fast Mode</CardTitle>
+          <CardTitle className="text-base">Последние изменения быстрого режима</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -346,13 +362,13 @@ export default async function GameProfilesPage({
                 <TH>Герой</TH>
                 <TH>Объект</TH>
                 <TH>Количество</TH>
-                <TH>Gold Added</TH>
+                <TH>Золото</TH>
               </tr>
             </THead>
             <TBody>
               {latestLootLogs.map((item) => (
                 <tr key={item.id}>
-                  <TD>{item.createdAt.toLocaleString("ru-RU")}</TD>
+                  <TD>{formatDateTimeRu(item.createdAt)}</TD>
                   <TD>{item.profile.heroName}</TD>
                   <TD>{item.object.name}</TD>
                   <TD>{item.quantity}</TD>

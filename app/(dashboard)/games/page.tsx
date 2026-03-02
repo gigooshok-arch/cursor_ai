@@ -1,5 +1,6 @@
 import { AccessLevel } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAccount } from "@/lib/auth";
 import { getProfileCountersByObjectType, goldFromPrice } from "@/lib/business";
+import { formatDateRu } from "@/lib/formatting";
+import { buildProfileHref } from "@/lib/profile-slug";
 import { prisma } from "@/lib/prisma";
 import { getTabAccessForRole, isAccessAllowed, requireTabAccess } from "@/lib/rbac";
 
@@ -151,15 +154,15 @@ export default async function GamesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="page-title">Games</h1>
+        <h1 className="page-title">Игры</h1>
         <p className="text-sm text-slate-600">
-          История игр и мастер создания логов с inline-редактором лута/достижений.
+          История игр и мастер создания логов с встроенным редактором лута/достижений.
         </p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Create Game Wizard</CardTitle>
+          <CardTitle className="text-base">Мастер создания игры</CardTitle>
         </CardHeader>
         <CardContent>
           {canWrite ? (
@@ -216,7 +219,7 @@ export default async function GamesPage() {
               </div>
 
               <div className="rounded-md border border-slate-200 p-3">
-                <p className="mb-2 text-sm font-medium">Inline loot/achievement editor</p>
+                <p className="mb-2 text-sm font-medium">Редактор лута/достижений</p>
                 <div className="grid gap-3 md:grid-cols-3">
                   <div>
                     <Label htmlFor="lootObjectId">Игровой объект</Label>
@@ -234,7 +237,7 @@ export default async function GamesPage() {
                     <Input id="lootQuantity" name="lootQuantity" type="number" min={1} defaultValue={1} />
                   </div>
                   <div className="text-xs text-slate-500">
-                    Золото рассчитывается автоматически: <strong>Math.floor(price / 2)</strong> * quantity.
+                    Золото рассчитывается автоматически: <strong>Math.floor(price / 2)</strong> × quantity.
                   </div>
                 </div>
               </div>
@@ -260,23 +263,36 @@ export default async function GamesPage() {
           <Table>
             <THead>
               <tr>
-                <TH>Дата</TH>
+                <TH>Дата игры</TH>
                 <TH>Активность</TH>
                 <TH>Мастер</TH>
                 <TH>Участники</TH>
-                <TH>Loot / Gold</TH>
+                <TH>Лут / Золото</TH>
               </tr>
             </THead>
             <TBody>
               {gameLogs.map((log) => (
                 <tr key={log.id}>
-                  <TD>{log.date.toLocaleString("ru-RU")}</TD>
+                  <TD>{formatDateRu(log.date)}</TD>
                   <TD>{log.activityType.name}</TD>
-                  <TD>{log.master.fullName}</TD>
+                  <TD>
+                    <Link
+                      href={buildProfileHref("employee", log.masterId)}
+                      className="font-medium underline"
+                    >
+                      {log.master.fullName}
+                    </Link>
+                  </TD>
                   <TD>
                     <div className="flex flex-wrap gap-1">
                       {log.participants.map((row) => (
-                        <Badge key={row.id}>{row.participant.fullName}</Badge>
+                        <Link
+                          key={row.id}
+                          href={buildProfileHref("participant", row.participantId)}
+                          className="inline-flex"
+                        >
+                          <Badge>{row.participant.fullName}</Badge>
+                        </Link>
                       ))}
                     </div>
                   </TD>
@@ -284,10 +300,10 @@ export default async function GamesPage() {
                     <div className="space-y-1">
                       {log.lootLines.map((loot) => (
                         <p key={loot.id} className="text-xs">
-                          {loot.gameObject.name} x{loot.quantity} = {loot.totalGold} gold
+                          {loot.gameObject.name} ×{loot.quantity} = {loot.totalGold} золота
                         </p>
                       ))}
-                      <p className="font-medium">Итого gold: {log.lootDistributed}</p>
+                      <p className="font-medium">Итого золота: {log.lootDistributed}</p>
                     </div>
                   </TD>
                 </tr>

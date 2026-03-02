@@ -1,5 +1,6 @@
 import { AccessLevel, Gender } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,11 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { requireAccount } from "@/lib/auth";
 import { splitFullName } from "@/lib/business";
+import { normalizePhoneRu } from "@/lib/formatting";
+import { buildProfileHref } from "@/lib/profile-slug";
 import { prisma } from "@/lib/prisma";
 import { getTabAccessForRole, isAccessAllowed, requireTabAccess } from "@/lib/rbac";
 
@@ -33,11 +37,14 @@ async function createEmployeeAction(formData: FormData): Promise<void> {
       name,
       patronymic,
       position: String(formData.get("position") ?? "") || null,
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       isActivist: formData.get("isActivist") === "on",
+      createdByAccountId: account.id,
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function updateEmployeeAction(formData: FormData): Promise<void> {
@@ -57,11 +64,13 @@ async function updateEmployeeAction(formData: FormData): Promise<void> {
       name,
       patronymic,
       position: String(formData.get("position") ?? "") || null,
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       isActivist: formData.get("isActivist") === "on",
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function bulkDeleteEmployeesAction(formData: FormData): Promise<void> {
@@ -102,15 +111,18 @@ async function createParticipantAction(formData: FormData): Promise<void> {
     data: {
       fullName,
       photo: String(formData.get("photo") ?? "") || null,
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       age: Number.isFinite(age) ? age : null,
       school: String(formData.get("school") ?? "") || null,
       className: String(formData.get("className") ?? "") || null,
       gender: genderRaw ? (genderRaw as Gender) : null,
       note: String(formData.get("note") ?? "") || null,
+      createdByAccountId: account.id,
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function updateParticipantAction(formData: FormData): Promise<void> {
@@ -128,15 +140,17 @@ async function updateParticipantAction(formData: FormData): Promise<void> {
     data: {
       fullName: String(formData.get("fullName") ?? "").trim(),
       photo: String(formData.get("photo") ?? "") || null,
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       age: Number.isFinite(age) ? age : null,
       school: String(formData.get("school") ?? "") || null,
       className: String(formData.get("className") ?? "") || null,
       gender: genderRaw ? (genderRaw as Gender) : null,
       note: String(formData.get("note") ?? "") || null,
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function bulkDeleteParticipantsAction(formData: FormData): Promise<void> {
@@ -172,11 +186,14 @@ async function createRelativeAction(formData: FormData): Promise<void> {
   await prisma.relative.create({
     data: {
       fullName,
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       note: String(formData.get("note") ?? "") || null,
+      createdByAccountId: account.id,
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function updateRelativeAction(formData: FormData): Promise<void> {
@@ -189,11 +206,13 @@ async function updateRelativeAction(formData: FormData): Promise<void> {
     where: { id },
     data: {
       fullName: String(formData.get("fullName") ?? "").trim(),
-      phone: String(formData.get("phone") ?? "") || null,
+      phone: normalizePhoneRu(String(formData.get("phone") ?? "")),
       note: String(formData.get("note") ?? "") || null,
+      updatedByAccountId: account.id,
     },
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function bulkDeleteRelativesAction(formData: FormData): Promise<void> {
@@ -228,22 +247,33 @@ async function addRelationLinkAction(formData: FormData): Promise<void> {
     return;
   }
 
-  await prisma.relationLink.upsert({
-    where: {
-      participantId_relativeId_relationType: {
+  await prisma.$transaction(async (tx) => {
+    await tx.relationLink.upsert({
+      where: {
+        participantId_relativeId_relationType: {
+          participantId,
+          relativeId,
+          relationType,
+        },
+      },
+      create: {
         participantId,
         relativeId,
         relationType,
       },
-    },
-    create: {
-      participantId,
-      relativeId,
-      relationType,
-    },
-    update: {},
+      update: {},
+    });
+    await tx.participant.update({
+      where: { id: participantId },
+      data: { updatedByAccountId: account.id },
+    });
+    await tx.relative.update({
+      where: { id: relativeId },
+      data: { updatedByAccountId: account.id },
+    });
   });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 async function removeRelationLinkAction(formData: FormData): Promise<void> {
@@ -255,8 +285,23 @@ async function removeRelationLinkAction(formData: FormData): Promise<void> {
   if (!id) {
     return;
   }
-  await prisma.relationLink.delete({ where: { id } });
+  const existing = await prisma.relationLink.findUnique({ where: { id } });
+  if (!existing) {
+    return;
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.relationLink.delete({ where: { id } });
+    await tx.participant.update({
+      where: { id: existing.participantId },
+      data: { updatedByAccountId: account.id },
+    });
+    await tx.relative.update({
+      where: { id: existing.relativeId },
+      data: { updatedByAccountId: account.id },
+    });
+  });
   revalidatePath("/people");
+  revalidatePath("/profile");
 }
 
 export default async function PeoplePage() {
@@ -288,9 +333,9 @@ export default async function PeoplePage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="page-title">People management</h1>
+        <h1 className="page-title">Люди</h1>
         <p className="text-sm text-slate-600">
-          Массовые операции по сотрудникам, участникам и родственникам.
+          Массовые операции по сотрудникам, участникам и родственникам с сортировкой ФИО по алфавиту.
         </p>
       </header>
 
@@ -303,7 +348,7 @@ export default async function PeoplePage() {
             <form action={createEmployeeAction} className="grid gap-2 md:grid-cols-4">
               <Input name="fullName" placeholder="ФИО" required />
               <Input name="position" placeholder="Должность" />
-              <Input name="phone" placeholder="Телефон" />
+              <PhoneInput name="phone" placeholder="+7 (___) ___-__-__" />
               <label className="flex min-h-11 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm">
                 <Checkbox name="isActivist" />
                 Активист
@@ -322,7 +367,7 @@ export default async function PeoplePage() {
                   <TH>ФИО</TH>
                   <TH>Должность</TH>
                   <TH>Телефон</TH>
-                  <TH>Аккаунт</TH>
+                  <TH>Роль</TH>
                   <TH>Активист</TH>
                 </tr>
               </THead>
@@ -334,9 +379,16 @@ export default async function PeoplePage() {
                         <Checkbox name="employeeIds" value={employee.id} />
                       </TD>
                     ) : null}
-                    <TD>{employee.fullName}</TD>
+                    <TD>
+                      <Link
+                        href={buildProfileHref("employee", employee.id)}
+                        className="font-medium underline"
+                      >
+                        {employee.fullName}
+                      </Link>
+                    </TD>
                     <TD>{employee.position ?? "—"}</TD>
-                    <TD>{employee.phone ?? "—"}</TD>
+                    <TD>{normalizePhoneRu(employee.phone) ?? "—"}</TD>
                     <TD>
                       {employee.account ? (
                         <div className="space-y-1">
@@ -369,7 +421,7 @@ export default async function PeoplePage() {
                     <input type="hidden" name="id" value={employee.id} />
                     <Input name="fullName" defaultValue={employee.fullName} required />
                     <Input name="position" defaultValue={employee.position ?? ""} />
-                    <Input name="phone" defaultValue={employee.phone ?? ""} />
+                    <PhoneInput name="phone" defaultValue={employee.phone ?? ""} />
                     <label className="flex min-h-11 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm">
                       <Checkbox name="isActivist" defaultChecked={employee.isActivist} />
                       Активист
@@ -393,7 +445,7 @@ export default async function PeoplePage() {
           {canWrite ? (
             <form action={createParticipantAction} className="grid gap-2 md:grid-cols-4">
               <Input name="fullName" placeholder="ФИО" required />
-              <Input name="phone" placeholder="Телефон" />
+              <PhoneInput name="phone" placeholder="+7 (___) ___-__-__" />
               <Input name="age" type="number" min={1} placeholder="Возраст" />
               <Input name="school" placeholder="Школа" />
               <Input name="className" placeholder="Класс" />
@@ -419,7 +471,7 @@ export default async function PeoplePage() {
                   <TH>ФИО</TH>
                   <TH>Школа/класс</TH>
                   <TH>Телефон</TH>
-                  <TH>Профиль</TH>
+                  <TH>Золото</TH>
                   <TH>Возраст</TH>
                 </tr>
               </THead>
@@ -431,12 +483,19 @@ export default async function PeoplePage() {
                         <Checkbox name="participantIds" value={participant.id} />
                       </TD>
                     ) : null}
-                    <TD>{participant.fullName}</TD>
+                    <TD>
+                      <Link
+                        href={buildProfileHref("participant", participant.id)}
+                        className="font-medium underline"
+                      >
+                        {participant.fullName}
+                      </Link>
+                    </TD>
                     <TD>
                       {[participant.school, participant.className].filter(Boolean).join(", ") || "—"}
                     </TD>
-                    <TD>{participant.phone ?? "—"}</TD>
-                    <TD>{participant.gameProfile?.heroName ?? "—"}</TD>
+                    <TD>{normalizePhoneRu(participant.phone) ?? "—"}</TD>
+                    <TD>{participant.gameProfile?.gold ?? "—"}</TD>
                     <TD>{participant.age ?? "—"}</TD>
                   </tr>
                 ))}
@@ -458,7 +517,7 @@ export default async function PeoplePage() {
                   <form key={participant.id} action={updateParticipantAction} className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 md:grid-cols-4">
                     <input type="hidden" name="id" value={participant.id} />
                     <Input name="fullName" defaultValue={participant.fullName} required />
-                    <Input name="phone" defaultValue={participant.phone ?? ""} />
+                    <PhoneInput name="phone" defaultValue={participant.phone ?? ""} />
                     <Input name="age" type="number" min={1} defaultValue={participant.age ?? ""} />
                     <Input name="school" defaultValue={participant.school ?? ""} />
                     <Input name="className" defaultValue={participant.className ?? ""} />
@@ -494,7 +553,7 @@ export default async function PeoplePage() {
             <>
               <form action={createRelativeAction} className="grid gap-2 md:grid-cols-3">
                 <Input name="fullName" placeholder="ФИО родственника" required />
-                <Input name="phone" placeholder="Телефон" />
+                <PhoneInput name="phone" placeholder="+7 (___) ___-__-__" />
                 <Input name="note" placeholder="Примечание" />
                 <Button type="submit" className="md:col-span-3 md:w-fit">
                   Добавить родственника
@@ -544,7 +603,7 @@ export default async function PeoplePage() {
                   {canWrite ? <TH className="w-12">#</TH> : null}
                   <TH>ФИО</TH>
                   <TH>Телефон</TH>
-                  <TH>Связей</TH>
+                  <TH>Родственники</TH>
                   <TH>Примечание</TH>
                 </tr>
               </THead>
@@ -556,8 +615,15 @@ export default async function PeoplePage() {
                         <Checkbox name="relativeIds" value={relative.id} />
                       </TD>
                     ) : null}
-                    <TD>{relative.fullName}</TD>
-                    <TD>{relative.phone ?? "—"}</TD>
+                    <TD>
+                      <Link
+                        href={buildProfileHref("relative", relative.id)}
+                        className="font-medium underline"
+                      >
+                        {relative.fullName}
+                      </Link>
+                    </TD>
+                    <TD>{normalizePhoneRu(relative.phone) ?? "—"}</TD>
                     <TD>{relative.relationLinks.length}</TD>
                     <TD>{relative.note ?? "—"}</TD>
                   </tr>
@@ -580,7 +646,7 @@ export default async function PeoplePage() {
                   <form key={relative.id} action={updateRelativeAction} className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 md:grid-cols-3">
                     <input type="hidden" name="id" value={relative.id} />
                     <Input name="fullName" defaultValue={relative.fullName} required />
-                    <Input name="phone" defaultValue={relative.phone ?? ""} />
+                    <PhoneInput name="phone" defaultValue={relative.phone ?? ""} />
                     <Input name="note" defaultValue={relative.note ?? ""} />
                     <Button type="submit" size="sm" className="md:col-span-3 md:w-fit">
                       Сохранить изменения
@@ -600,7 +666,20 @@ export default async function PeoplePage() {
                   className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white p-2 text-sm"
                 >
                   <span>
-                    {link.participant.fullName} ↔ {link.relative.fullName} ({link.relationType})
+                    <Link
+                      href={buildProfileHref("participant", link.participantId)}
+                      className="font-medium underline"
+                    >
+                      {link.participant.fullName}
+                    </Link>{" "}
+                    ↔{" "}
+                    <Link
+                      href={buildProfileHref("relative", link.relativeId)}
+                      className="font-medium underline"
+                    >
+                      {link.relative.fullName}
+                    </Link>{" "}
+                    ({link.relationType})
                   </span>
                   {canWrite ? (
                     <form action={removeRelationLinkAction}>

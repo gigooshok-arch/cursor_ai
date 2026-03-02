@@ -115,7 +115,7 @@ export default async function AdminTabsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="page-title">Administration: Tabs management</h1>
+        <h1 className="page-title">Администрирование: вкладки меню</h1>
         <p className="text-sm text-slate-600">
           Добавление, переименование и отключение вкладок бокового меню с привязкой к SQL View.
         </p>
@@ -137,7 +137,7 @@ export default async function AdminTabsPage() {
                 <Input id="key" name="key" placeholder="reports" required />
               </div>
               <div>
-                <Label htmlFor="route">Route</Label>
+                <Label htmlFor="route">Путь</Label>
                 <Input id="route" name="route" placeholder="/reports" required />
               </div>
               <div>

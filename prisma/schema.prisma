@@ -33,7 +33,11 @@ model Employee {
   position    String?
   phone       String?
   isActivist  Boolean   @default(false)
-  account     Account?
+  createdByAccountId Int?
+  createdByAccount   Account?  @relation("EmployeeCreatedBy", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+  updatedByAccountId Int?
+  updatedByAccount   Account?  @relation("EmployeeUpdatedBy", fields: [updatedByAccountId], references: [id], onDelete: SetNull)
+  account     Account?  @relation("EmployeeAccount")
   gamesMaster GameLog[] @relation("MasterGames")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -42,7 +46,7 @@ model Employee {
 model Account {
   id                  Int       @id @default(autoincrement())
   employeeId          Int       @unique
-  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee            Employee  @relation("EmployeeAccount", fields: [employeeId], references: [id], onDelete: Cascade)
   login               String    @unique
   passwordHash        String
   roleId              Int
@@ -50,6 +54,12 @@ model Account {
   isBlocked           Boolean   @default(false)
   forcePasswordChange Boolean   @default(true)
   sessions            Session[]
+  createdParticipants Participant[] @relation("ParticipantCreatedBy")
+  updatedParticipants Participant[] @relation("ParticipantUpdatedBy")
+  createdEmployees    Employee[]    @relation("EmployeeCreatedBy")
+  updatedEmployees    Employee[]    @relation("EmployeeUpdatedBy")
+  createdRelatives    Relative[]    @relation("RelativeCreatedBy")
+  updatedRelatives    Relative[]    @relation("RelativeUpdatedBy")
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 }
@@ -107,6 +117,10 @@ model Participant {
   className           String?
   gender              Gender?
   note                String?
+  createdByAccountId  Int?
+  createdByAccount    Account?             @relation("ParticipantCreatedBy", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+  updatedByAccountId  Int?
+  updatedByAccount    Account?             @relation("ParticipantUpdatedBy", fields: [updatedByAccountId], references: [id], onDelete: SetNull)
   relativityLinks     RelationLink[]
   gameProfile         GameProfile?
   gameLogParticipants GameLogParticipant[]
@@ -119,6 +133,10 @@ model Relative {
   fullName      String
   phone         String?
   note          String?
+  createdByAccountId Int?
+  createdByAccount   Account?      @relation("RelativeCreatedBy", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+  updatedByAccountId Int?
+  updatedByAccount   Account?      @relation("RelativeUpdatedBy", fields: [updatedByAccountId], references: [id], onDelete: SetNull)
   relationLinks RelationLink[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt

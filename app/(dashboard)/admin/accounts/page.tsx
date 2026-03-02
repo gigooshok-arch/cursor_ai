@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { AccessLevel } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead } from "@/components/ui/table";
 import { requireAccount } from "@/lib/auth";
 import { generateUniqueLogin } from "@/lib/business";
+import { buildProfileHref } from "@/lib/profile-slug";
 import { prisma } from "@/lib/prisma";
 import { getTabAccessForRole, isAccessAllowed, requireTabAccess } from "@/lib/rbac";
 
@@ -142,7 +144,7 @@ export default async function AdminAccountsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="page-title">Administration: Access management</h1>
+        <h1 className="page-title">Администрирование: доступы</h1>
         <p className="text-sm text-slate-600">
           CRUD аккаунтов, блокировка и сброс паролей с флагом обязательной смены.
         </p>
@@ -203,10 +205,10 @@ export default async function AdminAccountsPage() {
               <tr>
                 <TH>ID</TH>
                 <TH>Логин</TH>
-                <TH>Сотрудник</TH>
+                <TH>ФИО сотрудника</TH>
                 <TH>Роль</TH>
                 <TH>Статус</TH>
-                <TH>forcePasswordChange</TH>
+                <TH>Смена пароля при входе</TH>
                 {canWrite ? <TH>Действия</TH> : null}
               </tr>
             </THead>
@@ -215,7 +217,14 @@ export default async function AdminAccountsPage() {
                 <tr key={item.id}>
                   <TD>{item.id}</TD>
                   <TD>{item.login}</TD>
-                  <TD>{item.employee.fullName}</TD>
+                  <TD>
+                    <Link
+                      href={buildProfileHref("employee", item.employeeId)}
+                      className="font-medium underline"
+                    >
+                      {item.employee.fullName}
+                    </Link>
+                  </TD>
                   <TD>
                     {canWrite ? (
                       <form action={updateRoleAction} className="flex min-w-44 items-center gap-2">

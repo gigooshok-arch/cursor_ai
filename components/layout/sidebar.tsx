@@ -24,6 +24,12 @@ export function Sidebar({ fullName, roleName, tabs }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  const accessLabel = (access: string): string => {
+    if (access === "WRITE") return "Изм.";
+    if (access === "READ") return "Чт.";
+    return access;
+  };
+
   return (
     <>
       <div className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
@@ -67,7 +73,7 @@ export function Sidebar({ fullName, roleName, tabs }: SidebarProps) {
               onClick={() => setOpen(false)}
             >
               <span>{tab.title}</span>
-              <span className="text-xs opacity-80">{tab.access}</span>
+              <span className="text-xs opacity-80">{accessLabel(tab.access)}</span>
             </Link>
           ))}
         </nav>

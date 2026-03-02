@@ -134,28 +134,34 @@ async function main() {
 
   const adminRole = await prisma.role.upsert({
     where: { code: "ADMIN" },
-    update: { name: "Admin" },
-    create: { code: "ADMIN", name: "Admin" },
+    update: { name: "Администратор" },
+    create: { code: "ADMIN", name: "Администратор" },
   });
   const directorRole = await prisma.role.upsert({
     where: { code: "DIRECTOR" },
-    update: { name: "Director" },
-    create: { code: "DIRECTOR", name: "Director" },
+    update: { name: "Директор" },
+    create: { code: "DIRECTOR", name: "Директор" },
   });
   const volunteerRole = await prisma.role.upsert({
     where: { code: "VOLUNTEER" },
-    update: { name: "Volunteer" },
-    create: { code: "VOLUNTEER", name: "Volunteer" },
+    update: { name: "Волонтёр" },
+    create: { code: "VOLUNTEER", name: "Волонтёр" },
+  });
+  const pedagogueRole = await prisma.role.upsert({
+    where: { code: "PEDAGOGUE" },
+    update: { name: "Педагог" },
+    create: { code: "PEDAGOGUE", name: "Педагог" },
   });
 
   const tabs = [
     { key: "dashboard", title: "Главная", route: "/dashboard", sqlViewName: "v_dashboard", order: 1 },
-    { key: "people", title: "People", route: "/people", sqlViewName: "v_people", order: 2 },
-    { key: "game_profiles", title: "Game Profiles", route: "/game-profiles", sqlViewName: "v_game_profiles", order: 3 },
-    { key: "games", title: "Games", route: "/games", sqlViewName: "v_games", order: 4 },
-    { key: "admin_accounts", title: "Admin Accounts", route: "/admin/accounts", sqlViewName: "v_admin_accounts", order: 5 },
-    { key: "admin_roles", title: "Admin Roles", route: "/admin/roles", sqlViewName: "v_admin_roles", order: 6 },
-    { key: "admin_tabs", title: "Admin Tabs", route: "/admin/tabs", sqlViewName: "v_admin_tabs", order: 7 },
+    { key: "profile", title: "Карточка", route: "/profile", sqlViewName: "v_profile", order: 2 },
+    { key: "people", title: "Люди", route: "/people", sqlViewName: "v_people", order: 3 },
+    { key: "game_profiles", title: "Игровые профили", route: "/game-profiles", sqlViewName: "v_game_profiles", order: 4 },
+    { key: "games", title: "Журнал игр", route: "/games", sqlViewName: "v_games", order: 5 },
+    { key: "admin_accounts", title: "Доступы", route: "/admin/accounts", sqlViewName: "v_admin_accounts", order: 6 },
+    { key: "admin_roles", title: "Роли", route: "/admin/roles", sqlViewName: "v_admin_roles", order: 7 },
+    { key: "admin_tabs", title: "Вкладки", route: "/admin/tabs", sqlViewName: "v_admin_tabs", order: 8 },
   ] as const;
 
   for (const tab of tabs) {
@@ -184,7 +190,18 @@ async function main() {
     ADMIN: Object.fromEntries(dbTabs.map((tab) => [tab.key, AccessLevel.WRITE])),
     DIRECTOR: {
       dashboard: AccessLevel.READ,
+      profile: AccessLevel.WRITE,
       people: AccessLevel.WRITE,
+      game_profiles: AccessLevel.WRITE,
+      games: AccessLevel.WRITE,
+      admin_accounts: AccessLevel.HIDDEN,
+      admin_roles: AccessLevel.HIDDEN,
+      admin_tabs: AccessLevel.HIDDEN,
+    },
+    PEDAGOGUE: {
+      dashboard: AccessLevel.READ,
+      profile: AccessLevel.WRITE,
+      people: AccessLevel.READ,
       game_profiles: AccessLevel.WRITE,
       games: AccessLevel.WRITE,
       admin_accounts: AccessLevel.HIDDEN,
@@ -193,8 +210,9 @@ async function main() {
     },
     VOLUNTEER: {
       dashboard: AccessLevel.READ,
-      people: AccessLevel.READ,
-      game_profiles: AccessLevel.READ,
+      profile: AccessLevel.READ,
+      people: AccessLevel.HIDDEN,
+      game_profiles: AccessLevel.HIDDEN,
       games: AccessLevel.READ,
       admin_accounts: AccessLevel.HIDDEN,
       admin_roles: AccessLevel.HIDDEN,
@@ -202,7 +220,7 @@ async function main() {
     },
   };
 
-  for (const role of [adminRole, directorRole, volunteerRole]) {
+  for (const role of [adminRole, directorRole, pedagogueRole, volunteerRole]) {
     for (const tab of dbTabs) {
       const roleConfig = permissionsConfig[role.code] ?? {};
       const access = roleConfig[tab.key] ?? AccessLevel.HIDDEN;
@@ -225,10 +243,10 @@ async function main() {
   }
 
   for (const name of [
-    "Quests",
-    "Roleplays",
-    "Sports",
-    "Tabletop games",
+    "Квесты",
+    "Ролевые игры",
+    "Спорт",
+    "Настольные игры",
   ]) {
     await prisma.activityType.upsert({
       where: { name },
@@ -268,10 +286,17 @@ async function main() {
     "+79990000003",
     true,
   );
+  const pedagogueEmployee = await ensureEmployee(
+    "Сидорова Екатерина Константиновна",
+    "Педагог",
+    "+79990000004",
+    true,
+  );
 
   const accountSeeds = [
     { employee: adminEmployee, role: adminRole, password: "admin123" },
     { employee: directorEmployee, role: directorRole, password: "director123" },
+    { employee: pedagogueEmployee, role: pedagogueRole, password: "pedagogue123" },
     { employee: volunteerEmployee, role: volunteerRole, password: "volunteer123" },
   ];
 

@@ -88,9 +88,9 @@ export default async function AdminRolesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="page-title">Administration: Roles matrix</h1>
+        <h1 className="page-title">Администрирование: матрица ролей</h1>
         <p className="text-sm text-slate-600">
-          Матрица прав доступа Hidden / Read / Write для каждой вкладки.
+          Матрица прав доступа Скрыто / Чтение / Изменение для каждой вкладки.
         </p>
       </header>
 
@@ -166,7 +166,7 @@ export default async function AdminRolesPage() {
                   <TH key={tab.id}>
                     <div className="space-y-1">
                       <p>{tab.title}</p>
-                      <p className="text-xs text-slate-500">{tab.sqlViewName ?? "no view"}</p>
+                      <p className="text-xs text-slate-500">{tab.sqlViewName ?? "без SQL View"}</p>
                     </div>
                   </TH>
                 ))}
@@ -192,9 +192,9 @@ export default async function AdminRolesPage() {
                             <input type="hidden" name="roleId" value={role.id} />
                             <input type="hidden" name="tabId" value={tab.id} />
                             <Select name="access" defaultValue={currentAccess}>
-                              <option value="HIDDEN">Hidden</option>
-                              <option value="READ">Read</option>
-                              <option value="WRITE">Write</option>
+                              <option value="HIDDEN">Скрыто</option>
+                              <option value="READ">Чтение</option>
+                              <option value="WRITE">Изменение</option>
                             </Select>
                             <Button type="submit" size="sm" variant="outline">
                               OK
