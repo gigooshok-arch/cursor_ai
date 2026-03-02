@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from .database import get_db
-from .models import Account, RoleCode
+from .models import Account
 from .security import decode_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -64,10 +64,15 @@ def get_current_account(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Аккаунт заблокирован администратором.",
         )
+    if account.role.is_blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Роль пользователя заблокирована администратором.",
+        )
     return account
 
 
-def require_roles(*allowed_roles: RoleCode) -> Callable[[Account], Account]:
+def require_roles(*allowed_roles: str) -> Callable[[Account], Account]:
     def checker(account: Annotated[Account, Depends(get_current_account)]) -> Account:
         if account.role.code not in allowed_roles:
             raise HTTPException(

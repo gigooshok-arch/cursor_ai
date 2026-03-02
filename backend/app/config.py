@@ -3,7 +3,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = BASE_DIR / "rassvet.sqlite3"
+DEFAULT_DB_PATH = BASE_DIR / "rassvet_app.sqlite3"
 
 
 class Settings(BaseSettings):

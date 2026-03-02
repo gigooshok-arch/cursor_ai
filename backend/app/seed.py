@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .business import generate_unique_login, gold_from_price
+from .business import generate_unique_login, gold_from_price, transliterate
 from .models import (
+    AccessLevel,
     Account,
     AchievementLog,
     Employee,
@@ -20,20 +22,90 @@ from .models import (
     RelationLink,
     Relative,
     Role,
-    RoleCode,
+    RoleTabPermission,
+    SystemRoleCode,
+    UiTab,
 )
 from .security import hash_password
 
 
-def _ensure_role(db: Session, code: RoleCode, name: str) -> Role:
+def _ensure_role(db: Session, code: str, name: str, is_blocked: bool = False) -> Role:
     role = db.scalar(select(Role).where(Role.code == code))
     if role is None:
-        role = Role(code=code, name=name)
+        role = Role(code=code, name=name, is_blocked=is_blocked)
         db.add(role)
         db.flush()
         return role
     role.name = name
+    role.is_blocked = is_blocked
     return role
+
+
+def _code_from_role_name(name: str) -> str:
+    latin = transliterate(name)
+    cleaned = re.sub(r"[^a-z0-9]+", "_", latin).strip("_")
+    return (cleaned or "role").upper()
+
+
+def ensure_custom_role(db: Session, name: str) -> Role:
+    code = _code_from_role_name(name)
+    suffix = 2
+    while db.scalar(select(Role).where(Role.code == code)) is not None:
+        code = f"{_code_from_role_name(name)}_{suffix}"
+        suffix += 1
+    role = Role(code=code, name=name, is_blocked=False)
+    db.add(role)
+    db.flush()
+    return role
+
+
+def _ensure_ui_tab(
+    db: Session,
+    *,
+    key: str,
+    title: str,
+    route: str,
+    description: str,
+    db_view_name: str | None,
+    sort_order: int,
+    is_enabled: bool = True,
+) -> UiTab:
+    tab = db.scalar(select(UiTab).where(UiTab.key == key))
+    if tab is None:
+        tab = UiTab(
+            key=key,
+            title=title,
+            route=route,
+            description=description,
+            db_view_name=db_view_name,
+            sort_order=sort_order,
+            is_enabled=is_enabled,
+        )
+        db.add(tab)
+        db.flush()
+        return tab
+
+    tab.title = title
+    tab.route = route
+    tab.description = description
+    tab.db_view_name = db_view_name
+    tab.sort_order = sort_order
+    tab.is_enabled = is_enabled
+    return tab
+
+
+def _ensure_permission(db: Session, role: Role, tab: UiTab, access: AccessLevel) -> None:
+    permission = db.scalar(
+        select(RoleTabPermission).where(
+            RoleTabPermission.role_id == role.id,
+            RoleTabPermission.tab_id == tab.id,
+        )
+    )
+    if permission is None:
+        permission = RoleTabPermission(role_id=role.id, tab_id=tab.id, access=access)
+        db.add(permission)
+        return
+    permission.access = access
 
 
 def _ensure_employee(
@@ -300,10 +372,84 @@ def _ensure_game_log(
 
 
 def seed_database(db: Session) -> None:
-    admin_role = _ensure_role(db, RoleCode.ADMIN, "Админ")
-    director_role = _ensure_role(db, RoleCode.DIRECTOR, "Директор")
-    volunteer_role = _ensure_role(db, RoleCode.VOLUNTEER, "Волонтер")
-    pedagogue_role = _ensure_role(db, RoleCode.PEDAGOGUE, "Педагог")
+    admin_role = _ensure_role(db, SystemRoleCode.ADMIN, "Админ")
+    director_role = _ensure_role(db, SystemRoleCode.DIRECTOR, "Директор")
+    volunteer_role = _ensure_role(db, SystemRoleCode.VOLUNTEER, "Волонтер")
+    pedagogue_role = _ensure_role(db, SystemRoleCode.PEDAGOGUE, "Педагог")
+
+    tabs = [
+        _ensure_ui_tab(
+            db,
+            key="admin",
+            title="Администрирование",
+            route="/admin",
+            description="Управление доступами, ролями и вкладками",
+            db_view_name="v_admin",
+            sort_order=1,
+        ),
+        _ensure_ui_tab(
+            db,
+            key="people",
+            title="Люди",
+            route="/people",
+            description="Сотрудники, родители и подростки",
+            db_view_name="v_people",
+            sort_order=2,
+        ),
+        _ensure_ui_tab(
+            db,
+            key="game_profiles",
+            title="Игровые профиля",
+            route="/game-profiles",
+            description="Быстрое управление игровыми профилями",
+            db_view_name="v_game_profiles",
+            sort_order=3,
+        ),
+        _ensure_ui_tab(
+            db,
+            key="games",
+            title="Игры",
+            route="/games",
+            description="Журнал и мастер создания игр",
+            db_view_name="v_games",
+            sort_order=4,
+        ),
+    ]
+
+    tabs_by_key = {tab.key: tab for tab in tabs}
+
+    matrix: dict[str, dict[str, AccessLevel]] = {
+        SystemRoleCode.ADMIN: {
+            "admin": AccessLevel.WRITE,
+            "people": AccessLevel.WRITE,
+            "game_profiles": AccessLevel.WRITE,
+            "games": AccessLevel.WRITE,
+        },
+        SystemRoleCode.DIRECTOR: {
+            "admin": AccessLevel.READ,
+            "people": AccessLevel.WRITE,
+            "game_profiles": AccessLevel.WRITE,
+            "games": AccessLevel.WRITE,
+        },
+        SystemRoleCode.PEDAGOGUE: {
+            "admin": AccessLevel.HIDDEN,
+            "people": AccessLevel.WRITE,
+            "game_profiles": AccessLevel.WRITE,
+            "games": AccessLevel.WRITE,
+        },
+        SystemRoleCode.VOLUNTEER: {
+            "admin": AccessLevel.HIDDEN,
+            "people": AccessLevel.READ,
+            "game_profiles": AccessLevel.READ,
+            "games": AccessLevel.READ,
+        },
+    }
+
+    roles = [admin_role, director_role, pedagogue_role, volunteer_role]
+    for role in roles:
+        for tab_key, tab in tabs_by_key.items():
+            access = matrix.get(role.code, {}).get(tab_key, AccessLevel.HIDDEN)
+            _ensure_permission(db, role, tab, access)
 
     admin_employee = _ensure_employee(
         db,

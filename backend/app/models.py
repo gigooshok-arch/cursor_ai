@@ -9,17 +9,23 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
-class RoleCode(str, enum.Enum):
-    ADMIN = "ADMIN"
-    DIRECTOR = "DIRECTOR"
-    VOLUNTEER = "VOLUNTEER"
-    PEDAGOGUE = "PEDAGOGUE"
-
-
 class GameObjectType(str, enum.Enum):
     LOOT = "LOOT"
     ACHIEVEMENT = "ACHIEVEMENT"
     GEAR = "GEAR"
+
+
+class AccessLevel(str, enum.Enum):
+    HIDDEN = "HIDDEN"
+    READ = "READ"
+    WRITE = "WRITE"
+
+
+class SystemRoleCode:
+    ADMIN = "ADMIN"
+    DIRECTOR = "DIRECTOR"
+    VOLUNTEER = "VOLUNTEER"
+    PEDAGOGUE = "PEDAGOGUE"
 
 
 class TimestampMixin:
@@ -35,10 +41,42 @@ class Role(Base, TimestampMixin):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    code: Mapped[RoleCode] = mapped_column(Enum(RoleCode), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     accounts: Mapped[list["Account"]] = relationship(back_populates="role")
+    permissions: Mapped[list["RoleTabPermission"]] = relationship(back_populates="role", cascade="all, delete-orphan")
+
+
+class UiTab(Base, TimestampMixin):
+    __tablename__ = "ui_tabs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    route: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    db_view_name: Mapped[str | None] = mapped_column(String(128))
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    permissions: Mapped[list["RoleTabPermission"]] = relationship(back_populates="tab", cascade="all, delete-orphan")
+
+
+class RoleTabPermission(Base):
+    __tablename__ = "role_tab_permissions"
+    __table_args__ = (
+        UniqueConstraint("role_id", "tab_id", name="uq_role_tab_permissions"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    tab_id: Mapped[int] = mapped_column(ForeignKey("ui_tabs.id", ondelete="CASCADE"), nullable=False)
+    access: Mapped[AccessLevel] = mapped_column(Enum(AccessLevel), default=AccessLevel.HIDDEN, nullable=False)
+
+    role: Mapped["Role"] = relationship(back_populates="permissions")
+    tab: Mapped["UiTab"] = relationship(back_populates="permissions")
 
 
 class Employee(Base, TimestampMixin):

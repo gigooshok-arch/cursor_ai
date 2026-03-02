@@ -41,7 +41,7 @@ const isRelative = computed(() => profile.value?.entity_type === "relative");
 function parseProfileLink(link) {
   const parts = link.split("/").filter(Boolean);
   if (parts.length !== 3 || parts[0] !== "profile") {
-    return { path: "/profiles" };
+    return { path: "/people" };
   }
   return {
     name: "profile",
@@ -168,7 +168,7 @@ onMounted(loadProfile);
         </p>
       </div>
       <div class="flex gap-2">
-        <RouterLink to="/profiles" class="secondary-btn">Назад к списку</RouterLink>
+        <RouterLink to="/people" class="secondary-btn">Назад к списку</RouterLink>
         <button v-if="canEdit" class="primary-btn" @click="showEditModal = true">Редактировать</button>
       </div>
     </header>

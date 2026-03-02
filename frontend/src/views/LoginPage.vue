@@ -25,7 +25,21 @@ async function submit() {
       throw new Error("Сервер вернул неполные данные авторизации.");
     }
     setSession(token, user);
-    await router.push("/dashboard");
+    if (user.нужна_смена_пароля) {
+      await router.push("/change-password");
+      return;
+    }
+    let targetRoute = "/people";
+    try {
+      const navResponse = await api.get("/ui/navigation");
+      const firstTab = navResponse.data?.данные?.вкладки?.[0];
+      if (firstTab?.route) {
+        targetRoute = firstTab.route;
+      }
+    } catch (_navError) {
+      // fallback route already set
+    }
+    await router.push(targetRoute);
   } catch (error) {
     errorText.value =
       error.response?.data?.detail ||
@@ -41,10 +55,7 @@ async function submit() {
   <div class="flex min-h-screen items-center justify-center bg-slate-100 p-4">
     <div class="card w-full max-w-md space-y-4">
       <div>
-        <h1 class="page-title">Вход в ERP «Рассвет»</h1>
-        <p class="mt-2 text-sm text-slate-600">
-          Новый стек: FastAPI + SQLAlchemy + Vue 3. Все данные и интерфейс на русском языке.
-        </p>
+        <h1 class="page-title">Авторизация</h1>
       </div>
 
       <form class="space-y-3" @submit.prevent="submit">
@@ -72,13 +83,6 @@ async function submit() {
       <p v-if="errorText" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
         {{ errorText }}
       </p>
-      <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        Тестовые пользователи: <br />
-        <strong>tymchenko_av / admin123</strong> ·
-        <strong>ivanova_ms / director123</strong> ·
-        <strong>petrov_na / volunteer123</strong> ·
-        <strong>sidorova_ek / pedagogue123</strong>
-      </div>
     </div>
   </div>
 </template>

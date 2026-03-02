@@ -1,11 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import { sessionState } from "./session";
-import DashboardPage from "./views/DashboardPage.vue";
+import AdminPage from "./views/AdminPage.vue";
+import ChangePasswordPage from "./views/ChangePasswordPage.vue";
+import GameProfilesPage from "./views/GameProfilesPage.vue";
+import GamesPage from "./views/GamesPage.vue";
 import LayoutPage from "./views/LayoutPage.vue";
 import LoginPage from "./views/LoginPage.vue";
+import PeoplePage from "./views/PeoplePage.vue";
 import ProfilePage from "./views/ProfilePage.vue";
-import ProfilesPage from "./views/ProfilesPage.vue";
 
 const routes = [
   {
@@ -15,23 +18,39 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
+    path: "/change-password",
+    name: "change-password",
+    component: ChangePasswordPage,
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/",
     component: LayoutPage,
     meta: { requiresAuth: true },
     children: [
       {
         path: "",
-        redirect: "/dashboard",
+        redirect: "/people",
       },
       {
-        path: "dashboard",
-        name: "dashboard",
-        component: DashboardPage,
+        path: "admin",
+        name: "admin",
+        component: AdminPage,
       },
       {
-        path: "profiles",
-        name: "profiles",
-        component: ProfilesPage,
+        path: "people",
+        name: "people",
+        component: PeoplePage,
+      },
+      {
+        path: "game-profiles",
+        name: "game-profiles",
+        component: GameProfilesPage,
+      },
+      {
+        path: "games",
+        name: "games",
+        component: GamesPage,
       },
       {
         path: "profile/:entityType/:id",
@@ -53,7 +72,7 @@ router.beforeEach((to) => {
     return "/login";
   }
   if (to.meta.guestOnly && isAuthed) {
-    return "/dashboard";
+    return "/people";
   }
   return true;
 });
