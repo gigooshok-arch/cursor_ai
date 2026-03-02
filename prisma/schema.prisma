@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum AccessLevel {
+  HIDDEN
+  READ
+  WRITE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum GameObjectType {
+  ITEM
+  ACHIEVEMENT
+  GEAR
+}
+
+model Employee {
+  id          Int       @id @default(autoincrement())
+  fullName    String
+  surname     String
+  name        String
+  patronymic  String?
+  position    String?
+  phone       String?
+  isActivist  Boolean   @default(false)
+  account     Account?
+  gamesMaster GameLog[] @relation("MasterGames")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Account {
+  id                  Int       @id @default(autoincrement())
+  employeeId          Int       @unique
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  login               String    @unique
+  passwordHash        String
+  roleId              Int
+  role                Role      @relation(fields: [roleId], references: [id])
+  isBlocked           Boolean   @default(false)
+  forcePasswordChange Boolean   @default(true)
+  sessions            Session[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  accountId Int
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  name        String
+  accounts    Account[]
+  permissions Permission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model NavTab {
+  id          Int          @id @default(autoincrement())
+  key         String       @unique
+  title       String
+  route       String       @unique
+  sqlViewName String?
+  isEnabled   Boolean      @default(true)
+  order       Int          @default(0)
+  permissions Permission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Permission {
+  id     Int         @id @default(autoincrement())
+  roleId Int
+  role   Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tabId  Int
+  tab    NavTab      @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  access AccessLevel @default(HIDDEN)
+
+  @@unique([roleId, tabId])
+}
+
+model Participant {
+  id                  Int                  @id @default(autoincrement())
+  fullName            String
+  photo               String?
+  phone               String?
+  age                 Int?
+  school              String?
+  className           String?
+  gender              Gender?
+  note                String?
+  relativityLinks     RelationLink[]
+  gameProfile         GameProfile?
+  gameLogParticipants GameLogParticipant[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Relative {
+  id            Int            @id @default(autoincrement())
+  fullName      String
+  phone         String?
+  note          String?
+  relationLinks RelationLink[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model RelationLink {
+  id            Int         @id @default(autoincrement())
+  participantId Int
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  relativeId    Int
+  relative      Relative    @relation(fields: [relativeId], references: [id], onDelete: Cascade)
+  relationType  String
+
+  @@unique([participantId, relativeId, relationType])
+}
+
+model ActivityType {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  gameLogs    GameLog[]
+}
+
+model GameObject {
+  id              Int                  @id @default(autoincrement())
+  name            String               @unique
+  objectType      GameObjectType
+  price           Int
+  parameters      String?
+  profileObjects  GameProfileObjectLog[]
+  gameLogLoots    GameLogLoot[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model GameProfile {
+  id           Int                  @id @default(autoincrement())
+  participantId Int                 @unique
+  participant  Participant          @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  heroName     String               @unique
+  loot         Int                  @default(0)
+  achievements Int                  @default(0)
+  gold         Int                  @default(0)
+  level        Int                  @default(1)
+  objectLogs   GameProfileObjectLog[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+}
+
+model GameProfileObjectLog {
+  id         Int         @id @default(autoincrement())
+  profileId  Int
+  profile    GameProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  objectId   Int
+  object     GameObject  @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  quantity   Int         @default(1)
+  goldAdded  Int
+  createdAt  DateTime    @default(now())
+}
+
+model GameLog {
+  id                   Int                  @id @default(autoincrement())
+  date                 DateTime             @default(now())
+  activityTypeId       Int
+  activityType         ActivityType         @relation(fields: [activityTypeId], references: [id])
+  masterId             Int
+  master               Employee             @relation("MasterGames", fields: [masterId], references: [id])
+  participantsSnapshot String
+  lootDistributed      Int                  @default(0)
+  notes                String?
+  participants         GameLogParticipant[]
+  lootLines            GameLogLoot[]
+  createdAt            DateTime             @default(now())
+}
+
+model GameLogParticipant {
+  id            Int         @id @default(autoincrement())
+  gameLogId     Int
+  gameLog       GameLog     @relation(fields: [gameLogId], references: [id], onDelete: Cascade)
+  participantId Int
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([gameLogId, participantId])
+}
+
+model GameLogLoot {
+  id         Int       @id @default(autoincrement())
+  gameLogId  Int
+  gameLog    GameLog   @relation(fields: [gameLogId], references: [id], onDelete: Cascade)
+  gameObjectId Int
+  gameObject GameObject @relation(fields: [gameObjectId], references: [id], onDelete: Cascade)
+  quantity   Int       @default(1)
+  totalGold  Int
+}
