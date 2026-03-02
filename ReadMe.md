@@ -1,34 +1,46 @@
-## ERP-Rassvet (FastAPI + Vue 3 + SQLite)
+## ERP-Rassvet (актуальный стек)
 
-Полная пересборка проекта под новый стек:
+Проект полностью переведен на новый стек:
 
-- **Backend:** FastAPI + SQLAlchemy + Pydantic
+- **Backend:** Python + FastAPI + SQLAlchemy + Pydantic
 - **Frontend:** Vue 3 (Vite) + Tailwind CSS
-- **База данных:** SQLite (режим WAL)
+- **База данных:** SQLite (WAL mode)
+- **Авторизация:** JWT (Bearer token)
 
-## Структура
+---
 
-- `backend/` — API-сервер, авторизация JWT, бизнес-логика, seed-данные.
-- `frontend/` — клиентское приложение Vue 3 с русским UI.
+## Структура проекта
 
-## Реализовано по ТЗ
+- `backend/` — API, модели БД, бизнес-логика, сидирование данных
+- `frontend/` — SPA-интерфейс на Vue 3
 
-- Полная русская локализация интерфейса и API-ответов (`сообщение`, `данные`, русские названия ролей).
+---
+
+## Что реализовано
+
+- Полная русская локализация UI и API-ответов.
 - Роли: **Админ**, **Директор**, **Волонтер**, **Педагог**.
-- JWT-авторизация.
-- Автогенерация логина по формуле `familia_ii` с транслитерацией (`Тымченко Александр Викторович` → `tymchenko_av`).
-- Единая карточка пользователя (`/profile/:entityType/:id`) с:
-  - фото и ФИО,
-  - кликабельными связями родственников,
-  - игровой историей,
-  - role-aware UX (для волонтера только чтение, без редактирования).
+- Автогенерация логина по формуле `familia_ii` (пример: `tymchenko_av`).
+- Единая карточка пользователя (`/profile/:entityType/:id`):
+  - фото + ФИО,
+  - кликабельные связи родственников,
+  - игровая история,
+  - ролевое отображение данных (read-only для волонтера).
 - Расчет золота: `floor(цена / 2)`.
-- Транзакционные операции изменения связей в профиле.
-- Работа в локальной сети: backend и frontend слушают `0.0.0.0`.
+- Транзакционные операции для изменения связей родственников.
+- Backend и frontend запускаются на `0.0.0.0` (доступ из локальной сети).
 
-## Быстрый запуск
+---
 
-### 1) Backend
+## Инструкция по запуску
+
+### Требования
+
+- Python 3.10+
+- Node.js 20+
+- npm
+
+### 1) Запуск backend (терминал №1)
 
 ```bash
 cd backend
@@ -36,9 +48,11 @@ python3 -m pip install -r requirements.txt
 python3 main.py
 ```
 
-API будет доступен на `http://0.0.0.0:8000`.
+После запуска:
+- API: `http://127.0.0.1:8000`
+- OpenAPI: `http://127.0.0.1:8000/docs`
 
-### 2) Frontend
+### 2) Запуск frontend (терминал №2)
 
 ```bash
 cd frontend
@@ -46,7 +60,18 @@ npm install
 npm run dev
 ```
 
-Frontend будет доступен на `http://0.0.0.0:5173`.
+После запуска:
+- Web UI: `http://127.0.0.1:5173`
+
+### 3) Доступ из локальной сети
+
+Так как сервисы слушают `0.0.0.0`, приложение открывается с других устройств по IP машины:
+
+- `http://<LAN_IP>:5173`
+
+Если используется локальный домен `erp-rassvet28.ru`, направьте его на IP машины в локальном DNS/hosts.
+
+---
 
 ## Тестовые пользователи
 
@@ -55,15 +80,35 @@ Frontend будет доступен на `http://0.0.0.0:5173`.
 - `petrov_na` / `volunteer123` — Волонтер
 - `sidorova_ek` / `pedagogue123` — Педагог
 
-## Ключевые API-маршруты
+---
 
-- `POST /api/auth/login` — вход.
-- `GET /api/auth/me` — текущий пользователь.
-- `GET /api/dashboard/summary` — сводка.
-- `GET /api/profiles` — поиск профилей.
-- `GET /api/profiles/{entity_type}/{id}` — карточка пользователя.
-- `PATCH /api/profiles/{entity_type}/{id}` — редактирование (только write-роли).
-- `POST /api/profiles/participant/{id}/relations` — добавить связь.
-- `DELETE /api/profiles/participant/{id}/relations/{relation_id}` — удалить связь.
-- `POST /api/games/preview-gold` — расчет золота.
-- `POST /api/games` — запись игрового лога.
+## Полезные команды
+
+### Backend
+
+```bash
+cd backend
+python3 -m pytest -q
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+---
+
+## Основные API-маршруты
+
+- `POST /api/auth/login` — вход
+- `GET /api/auth/me` — текущий пользователь
+- `GET /api/dashboard/summary` — сводка
+- `GET /api/profiles` — список/поиск профилей
+- `GET /api/profiles/{entity_type}/{id}` — карточка пользователя
+- `PATCH /api/profiles/{entity_type}/{id}` — редактирование (write-роли)
+- `POST /api/profiles/participant/{id}/relations` — добавить связь
+- `DELETE /api/profiles/participant/{id}/relations/{relation_id}` — удалить связь
+- `POST /api/games/preview-gold` — предпросмотр расчета золота
+- `POST /api/games` — создание игрового лога
