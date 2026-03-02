@@ -1,101 +1,69 @@
-## ERP-Rassvet (Next.js + Prisma + SQLite)
+## ERP-Rassvet (FastAPI + Vue 3 + SQLite)
 
-ERP-система для НКО «Рассвет» на стеке:
+Полная пересборка проекта под новый стек:
 
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS + shadcn-style UI components
-- Prisma ORM + SQLite
+- **Backend:** FastAPI + SQLAlchemy + Pydantic
+- **Frontend:** Vue 3 (Vite) + Tailwind CSS
+- **База данных:** SQLite (режим WAL)
 
-### Что реализовано
+## Структура
 
-- **Accounts + Employees**
-  - аккаунт связан с сотрудником 1:1;
-  - авто-генерация логина по формуле `surname_initials` с транслитерацией;
-  - блокировка аккаунта;
-  - сброс пароля в `pas123` с `forcePasswordChange=true`.
-- **Единый профиль (`/profile/[id]`)**
-  - универсальная карточка `UserCard` для Участника/Сотрудника/Родственника;
-  - deep links между участником и его родственниками;
-  - история игр пользователя;
-  - role-aware отображение данных (Admin/Pedagogue/Volunteer).
-- **RBAC**
-  - роли + матрица прав `Hidden / Read / Write`;
-  - динамический левый sidebar на основе `Permission` + `NavTab`;
-  - отдельная админ-страница для управления вкладками и их SQL view-привязкой.
-- **People management**
-  - bulk-операции (add/edit/delete) для сотрудников, участников, родственников;
-  - M-M связи родственников через `RelationLink`;
-  - bulk-операции выполняются через `prisma.$transaction`.
-- **Game Profiles**
-  - fast mode для мастеров: герой + объект + количество;
-  - авто-расчет экономики: `gold = Math.floor(price / 2) * quantity`;
-  - журнал последних изменений fast mode.
-- **Games**
-  - wizard создания лога игры;
-  - выбор активности, мастера, участников и inline-редактор лута;
-  - история игровых логов;
-  - операции создания логов выполняются через `prisma.$transaction`.
-- **SQLite WAL**
-  - при старте приложения включается `PRAGMA journal_mode=WAL` для многопользовательского доступа.
-- **Адаптивность**
-  - mobile-first интерфейс;
-  - hamburger-меню в sidebar на малых экранах;
-  - touch-friendly controls (минимум 44px).
-- **Локализация и форматы**
-  - интерфейс на русском языке;
-  - даты в формате `ДД.ММ.ГГГГ`;
-  - телефоны в формате `+7 (XXX) XXX-XX-XX`.
+- `backend/` — API-сервер, авторизация JWT, бизнес-логика, seed-данные.
+- `frontend/` — клиентское приложение Vue 3 с русским UI.
 
-### Быстрый старт
+## Реализовано по ТЗ
 
-1. Установить зависимости:
+- Полная русская локализация интерфейса и API-ответов (`сообщение`, `данные`, русские названия ролей).
+- Роли: **Админ**, **Директор**, **Волонтер**, **Педагог**.
+- JWT-авторизация.
+- Автогенерация логина по формуле `familia_ii` с транслитерацией (`Тымченко Александр Викторович` → `tymchenko_av`).
+- Единая карточка пользователя (`/profile/:entityType/:id`) с:
+  - фото и ФИО,
+  - кликабельными связями родственников,
+  - игровой историей,
+  - role-aware UX (для волонтера только чтение, без редактирования).
+- Расчет золота: `floor(цена / 2)`.
+- Транзакционные операции изменения связей в профиле.
+- Работа в локальной сети: backend и frontend слушают `0.0.0.0`.
 
-`npm install`
+## Быстрый запуск
 
-2. Поднять схему БД:
+### 1) Backend
 
-`npx prisma db push`
+```bash
+cd backend
+python3 -m pip install -r requirements.txt
+python3 main.py
+```
 
-3. Заполнить демо-данными:
+API будет доступен на `http://0.0.0.0:8000`.
 
-`npx prisma db seed`
+### 2) Frontend
 
-4. Запустить локальный сервер (с доступом из сети):
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-`npm run dev`
+Frontend будет доступен на `http://0.0.0.0:5173`.
 
-Сервер слушает `0.0.0.0:3000`.
+## Тестовые пользователи
 
-### Запуск в прод-режиме
+- `tymchenko_av` / `admin123` — Админ
+- `ivanova_ms` / `director123` — Директор
+- `petrov_na` / `volunteer123` — Волонтер
+- `sidorova_ek` / `pedagogue123` — Педагог
 
-`npm run build && npm run start`
+## Ключевые API-маршруты
 
-### Тестовые пользователи
-
-Создаются сидом:
-
-- `tymchenko_av` / `admin123` (Admin)
-- `ivanova_ms` / `director123` (Директор)
-- `sidorova_ek` / `pedagogue123` (Педагог)
-- `petrov_na` / `volunteer123` (Волонтёр)
-
-### Основные пути
-
-- `/login` — вход.
-- `/force-password` — обязательная смена пароля после сброса.
-- `/dashboard` — главная.
-- `/profile` — поиск и вход в единые карточки пользователей.
-- `/profile/[id]` — карточка конкретного пользователя.
-- `/people` — люди (сотрудники/участники/родственники).
-- `/game-profiles` — игровые профили и fast mode.
-- `/games` — история и мастер создания игр.
-- `/admin/accounts` — аккаунты.
-- `/admin/roles` — роли и матрица прав.
-- `/admin/tabs` — вкладки sidebar.
-
-### Полезные команды
-
-- `npm run lint` — TypeScript-проверка.
-- `npm run build` — production build check.
-- `npm run db:reset` — пересоздать SQLite и заново посеять данные.
+- `POST /api/auth/login` — вход.
+- `GET /api/auth/me` — текущий пользователь.
+- `GET /api/dashboard/summary` — сводка.
+- `GET /api/profiles` — поиск профилей.
+- `GET /api/profiles/{entity_type}/{id}` — карточка пользователя.
+- `PATCH /api/profiles/{entity_type}/{id}` — редактирование (только write-роли).
+- `POST /api/profiles/participant/{id}/relations` — добавить связь.
+- `DELETE /api/profiles/participant/{id}/relations/{relation_id}` — удалить связь.
+- `POST /api/games/preview-gold` — расчет золота.
+- `POST /api/games` — запись игрового лога.

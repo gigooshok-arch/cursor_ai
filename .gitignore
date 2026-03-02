@@ -21,3 +21,5 @@ coverage/
 prisma/dev.db
 prisma/dev.db-journal
 tsconfig.tsbuildinfo
+*.sqlite3
+backend/.pytest_cache/

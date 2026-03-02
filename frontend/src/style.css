@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.card {
+  border-radius: 0.9rem;
+  border: 1px solid #e2e8f0;
+  background: white;
+  padding: 1rem;
+}
+
+.primary-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+}
+
+.secondary-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+}
+
+.danger-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  background: #be123c;
+  color: white;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+}
+
+.field {
+  min-height: 44px;
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 0.55rem 0.75rem;
+}
+
