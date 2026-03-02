@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 
 import api from "../api";
 import { clearSession } from "../session";
+import { themeToggleLabel, toggleTheme } from "../theme";
 
 const router = useRouter();
 const currentPassword = ref("");
@@ -36,6 +37,9 @@ async function submit() {
 
 <template>
   <div class="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+    <button class="secondary-btn fixed right-3 top-3 !min-h-9 !px-3 !text-xs" @click="toggleTheme">
+      {{ themeToggleLabel }}
+    </button>
     <div class="card w-full max-w-md space-y-4">
       <h1 class="page-title">Смена пароля</h1>
       <p class="text-sm text-slate-600">

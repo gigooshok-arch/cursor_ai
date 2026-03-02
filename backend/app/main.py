@@ -471,6 +471,19 @@ def admin_update_account(
     if target is None:
         raise HTTPException(status_code=404, detail="Аккаунт не найден.")
 
+    if payload.login is not None:
+        normalized_login = payload.login.lower()
+        existing = db.scalar(
+            select(Account).where(
+                Account.login == normalized_login,
+                Account.id != target.id,
+            )
+        )
+        if existing is not None:
+            raise HTTPException(status_code=400, detail="Логин уже используется другим аккаунтом.")
+        target.login = normalized_login
+    if payload.employee_full_name is not None:
+        target.employee.full_name = payload.employee_full_name
     if payload.role_id is not None:
         role = db.get(Role, payload.role_id)
         if role is None:

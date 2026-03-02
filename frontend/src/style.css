@@ -66,3 +66,71 @@ body {
   padding: 0.55rem 0.75rem;
 }
 
+body.theme-dark {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+body.theme-dark .card {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.theme-dark .field {
+  background: #0b1220;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+body.theme-dark .field::placeholder {
+  color: #94a3b8;
+}
+
+body.theme-dark .secondary-btn {
+  background: #0f172a;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+body.theme-dark .primary-btn {
+  background: #1d4ed8;
+}
+
+body.theme-dark .danger-btn {
+  background: #be123c;
+}
+
+body.theme-dark .bg-white {
+  background-color: #111827 !important;
+}
+
+body.theme-dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+body.theme-dark .bg-slate-100 {
+  background-color: #0b1220 !important;
+}
+
+body.theme-dark .bg-slate-950\/40 {
+  background-color: rgb(2 6 23 / 70%) !important;
+}
+
+body.theme-dark .border-slate-100,
+body.theme-dark .border-slate-200,
+body.theme-dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+body.theme-dark .text-slate-500,
+body.theme-dark .text-slate-600,
+body.theme-dark .text-slate-700,
+body.theme-dark .text-slate-900 {
+  color: #cbd5e1 !important;
+}
+
+body.theme-dark .text-sky-700 {
+  color: #93c5fd !important;
+}
+

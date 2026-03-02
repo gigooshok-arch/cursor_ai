@@ -147,3 +147,37 @@ def test_profile_access_for_volunteer_read_only(client: TestClient) -> None:
     assert "игровой_профиль" not in data
     assert "родственники" in data
 
+
+def test_admin_can_edit_login_and_fio_with_unique_login_constraint(client: TestClient) -> None:
+    headers = auth_headers(client, "tymchenko_av", "admin123")
+    bootstrap = client.get("/api/admin/bootstrap", headers=headers)
+    assert bootstrap.status_code == 200
+    accounts = bootstrap.json()["данные"]["аккаунты"]
+    first = accounts[0]
+    second = accounts[1]
+
+    conflict = client.patch(
+        f"/api/admin/accounts/{first['id']}",
+        headers=headers,
+        json={"login": second["логин"]},
+    )
+    assert conflict.status_code == 400
+    assert "Логин уже используется" in conflict.json()["detail"]
+
+    updated = client.patch(
+        f"/api/admin/accounts/{first['id']}",
+        headers=headers,
+        json={
+            "login": "admin_unique_test",
+            "employee_full_name": "Тестов Тест Тестович",
+        },
+    )
+    assert updated.status_code == 200
+
+    refresh = client.get("/api/admin/bootstrap", headers=headers)
+    assert refresh.status_code == 200
+    refreshed_accounts = refresh.json()["данные"]["аккаунты"]
+    refreshed = next(row for row in refreshed_accounts if row["id"] == first["id"])
+    assert refreshed["логин"] == "admin_unique_test"
+    assert refreshed["сотрудник_фио"] == "Тестов Тест Тестович"
+

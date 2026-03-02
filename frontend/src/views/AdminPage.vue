@@ -8,14 +8,12 @@ const errorText = ref("");
 const subTab = ref("access");
 
 const data = reactive({
-  access: "READ",
   can_write: false,
   accounts: [],
   roles: [],
   tabs: [],
   permissionMatrix: [],
   employeesWithoutAccount: [],
-  views: [],
 });
 
 const accountCreateForm = reactive({
@@ -28,13 +26,12 @@ const roleCreateForm = reactive({
   name: "",
 });
 
-const tabCreateForm = reactive({
+const confirmState = reactive({
+  open: false,
   title: "",
-  route: "",
-  db_view_name: "",
-  description: "",
-  sort_order: 0,
-  is_enabled: true,
+  text: "",
+  action: null,
+  loading: false,
 });
 
 const permissionOptions = [
@@ -51,10 +48,6 @@ const permissionMap = computed(() => {
   return map;
 });
 
-function roleNameById(id) {
-  return data.roles.find((item) => item.id === id)?.название || "—";
-}
-
 function tabAccess(roleId, tabId) {
   return permissionMap.value.get(`${roleId}:${tabId}`) || "HIDDEN";
 }
@@ -63,20 +56,27 @@ function setError(error, fallback) {
   errorText.value = error.response?.data?.detail || fallback;
 }
 
+function normalizeAccountRow(row) {
+  return {
+    ...row,
+    логин: row.логин || "",
+    сотрудник_фио: row.сотрудник_фио || "",
+    роль_id: row.роль_id,
+  };
+}
+
 async function loadAdminData() {
   loading.value = true;
   errorText.value = "";
   try {
     const response = await api.get("/admin/bootstrap");
     const payload = response.data?.данные || {};
-    data.access = payload.доступ || "READ";
     data.can_write = Boolean(payload.can_write);
-    data.accounts = payload.аккаунты || [];
+    data.accounts = (payload.аккаунты || []).map(normalizeAccountRow);
     data.roles = payload.роли || [];
     data.tabs = payload.вкладки || [];
     data.permissionMatrix = payload.матрица_прав || [];
     data.employeesWithoutAccount = payload.сотрудники_без_аккаунта || [];
-    data.views = payload.представления_бд || [];
   } catch (error) {
     setError(error, "Не удалось загрузить данные администрирования.");
   } finally {
@@ -101,34 +101,79 @@ async function createAccount() {
   }
 }
 
-async function updateAccount(accountId, payload) {
+async function saveAccount(row) {
   if (!data.can_write) return;
   try {
-    await api.patch(`/admin/accounts/${accountId}`, payload);
+    await api.patch(`/admin/accounts/${row.id}`, {
+      login: row.логин,
+      employee_full_name: row.сотрудник_фио,
+      role_id: Number(row.роль_id),
+    });
     await loadAdminData();
   } catch (error) {
-    setError(error, "Не удалось обновить аккаунт.");
+    setError(error, "Не удалось сохранить аккаунт.");
   }
 }
 
-async function resetPassword(accountId) {
-  if (!data.can_write) return;
+function openConfirm(title, text, action) {
+  confirmState.open = true;
+  confirmState.title = title;
+  confirmState.text = text;
+  confirmState.action = action;
+}
+
+function closeConfirm() {
+  if (confirmState.loading) return;
+  confirmState.open = false;
+  confirmState.title = "";
+  confirmState.text = "";
+  confirmState.action = null;
+}
+
+async function runConfirm() {
+  if (!confirmState.action) return;
+  confirmState.loading = true;
   try {
-    await api.post(`/admin/accounts/${accountId}/reset-password`);
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось сбросить пароль.");
+    await confirmState.action();
+    closeConfirm();
+  } finally {
+    confirmState.loading = false;
   }
 }
 
-async function deleteAccount(accountId) {
-  if (!data.can_write) return;
-  try {
-    await api.delete(`/admin/accounts/${accountId}`);
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось удалить аккаунт.");
-  }
+function confirmBlockToggle(row) {
+  openConfirm(
+    row.заблокирован ? "Разблокировать аккаунт?" : "Заблокировать аккаунт?",
+    row.заблокирован
+      ? `Разблокировать логин ${row.логин}?`
+      : `Заблокировать логин ${row.логин}? Пользователь не сможет войти.`,
+    async () => {
+      await api.patch(`/admin/accounts/${row.id}`, { is_blocked: !row.заблокирован });
+      await loadAdminData();
+    },
+  );
+}
+
+function confirmResetPassword(row) {
+  openConfirm(
+    "Сбросить пароль?",
+    `Сбросить пароль для ${row.логин} на стандартный pas123 с обязательной сменой?`,
+    async () => {
+      await api.post(`/admin/accounts/${row.id}/reset-password`);
+      await loadAdminData();
+    },
+  );
+}
+
+function confirmDeleteAccount(row) {
+  openConfirm(
+    "Удалить аккаунт?",
+    `Удалить аккаунт ${row.логин}? Действие необратимо.`,
+    async () => {
+      await api.delete(`/admin/accounts/${row.id}`);
+      await loadAdminData();
+    },
+  );
 }
 
 async function createRole() {
@@ -177,49 +222,6 @@ async function updatePermission(roleId, tabId, access) {
   }
 }
 
-async function createTab() {
-  if (!data.can_write || !tabCreateForm.title.trim() || !tabCreateForm.route.trim()) return;
-  try {
-    await api.post("/admin/tabs", {
-      title: tabCreateForm.title.trim(),
-      route: tabCreateForm.route.trim(),
-      db_view_name: tabCreateForm.db_view_name.trim() || null,
-      description: tabCreateForm.description.trim() || null,
-      sort_order: Number(tabCreateForm.sort_order) || 0,
-      is_enabled: Boolean(tabCreateForm.is_enabled),
-    });
-    tabCreateForm.title = "";
-    tabCreateForm.route = "";
-    tabCreateForm.db_view_name = "";
-    tabCreateForm.description = "";
-    tabCreateForm.sort_order = 0;
-    tabCreateForm.is_enabled = true;
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось создать вкладку.");
-  }
-}
-
-async function updateTab(tabId, payload) {
-  if (!data.can_write) return;
-  try {
-    await api.patch(`/admin/tabs/${tabId}`, payload);
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось обновить вкладку.");
-  }
-}
-
-async function deleteTab(tabId) {
-  if (!data.can_write) return;
-  try {
-    await api.delete(`/admin/tabs/${tabId}`);
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось удалить вкладку.");
-  }
-}
-
 onMounted(loadAdminData);
 </script>
 
@@ -228,7 +230,7 @@ onMounted(loadAdminData);
     <header>
       <h1 class="page-title">Администрирование</h1>
       <p class="mt-2 text-sm text-slate-600">
-        Управление доступом, ролями и вкладками интерфейса.
+        Управление доступом и ролями.
       </p>
     </header>
 
@@ -247,16 +249,6 @@ onMounted(loadAdminData);
       >
         Управление ролями
       </button>
-      <button
-        class="secondary-btn"
-        :class="subTab === 'tabs' ? '!bg-slate-900 !text-white' : ''"
-        @click="subTab = 'tabs'"
-      >
-        Управление вкладками
-      </button>
-      <span class="ml-auto rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600">
-        Доступ: {{ data.access }}
-      </span>
     </div>
 
     <p v-if="loading" class="text-sm text-slate-500">Загрузка...</p>
@@ -298,15 +290,18 @@ onMounted(loadAdminData);
           </thead>
           <tbody>
             <tr v-for="item in data.accounts" :key="item.id" class="border-b border-slate-100">
-              <td class="p-2">{{ item.логин }}</td>
-              <td class="p-2">{{ item.сотрудник_фио }}</td>
               <td class="p-2">
-                <select
+                <input v-model="item.логин" class="field !min-h-9 !py-1 text-xs" :disabled="!data.can_write" />
+              </td>
+              <td class="p-2">
+                <input
+                  v-model="item.сотрудник_фио"
                   class="field !min-h-9 !py-1 text-xs"
-                  :value="item.роль_id"
                   :disabled="!data.can_write"
-                  @change="updateAccount(item.id, { role_id: Number($event.target.value) })"
-                >
+                />
+              </td>
+              <td class="p-2">
+                <select v-model="item.роль_id" class="field !min-h-9 !py-1 text-xs" :disabled="!data.can_write">
                   <option v-for="role in data.roles" :key="role.id" :value="role.id">{{ role.название }}</option>
                 </select>
               </td>
@@ -318,24 +313,27 @@ onMounted(loadAdminData);
               <td class="p-2">{{ item.нужна_смена_пароля ? "Да" : "Нет" }}</td>
               <td class="p-2">
                 <div class="flex flex-wrap gap-1">
+                  <button class="secondary-btn !min-h-8 !px-2 text-xs" :disabled="!data.can_write" @click="saveAccount(item)">
+                    Сохранить
+                  </button>
                   <button
                     class="secondary-btn !min-h-8 !px-2 text-xs"
                     :disabled="!data.can_write"
-                    @click="updateAccount(item.id, { is_blocked: !item.заблокирован })"
+                    @click="confirmBlockToggle(item)"
                   >
                     {{ item.заблокирован ? "Разблокировать" : "Заблокировать" }}
                   </button>
                   <button
                     class="secondary-btn !min-h-8 !px-2 text-xs"
                     :disabled="!data.can_write"
-                    @click="resetPassword(item.id)"
+                    @click="confirmResetPassword(item)"
                   >
                     Сбросить пароль
                   </button>
                   <button
                     class="danger-btn !min-h-8 !px-2 text-xs"
                     :disabled="!data.can_write"
-                    @click="deleteAccount(item.id)"
+                    @click="confirmDeleteAccount(item)"
                   >
                     Удалить
                   </button>
@@ -406,103 +404,22 @@ onMounted(loadAdminData);
       </div>
     </article>
 
-    <article v-if="subTab === 'tabs'" class="card space-y-4">
-      <h2 class="text-lg font-semibold">Таблица вкладок</h2>
-
-      <div v-if="data.can_write" class="grid gap-2 xl:grid-cols-3">
-        <input v-model="tabCreateForm.title" class="field" placeholder="Название вкладки" />
-        <input v-model="tabCreateForm.route" class="field" placeholder="/my-tab" />
-        <select v-model="tabCreateForm.db_view_name" class="field">
-          <option value="">Без представления</option>
-          <option v-for="viewName in data.views" :key="viewName" :value="viewName">{{ viewName }}</option>
-        </select>
-        <input v-model="tabCreateForm.description" class="field xl:col-span-2" placeholder="Описание" />
-        <div class="grid grid-cols-2 gap-2">
-          <input
-            v-model="tabCreateForm.sort_order"
-            class="field"
-            type="number"
-            placeholder="Порядок"
-          />
-          <label class="flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm">
-            <input v-model="tabCreateForm.is_enabled" type="checkbox" />
-            Включена
-          </label>
+    <div
+      v-if="confirmState.open"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
+      @click.self="closeConfirm"
+    >
+      <div class="card w-full max-w-md space-y-3">
+        <h3 class="text-lg font-semibold">{{ confirmState.title }}</h3>
+        <p class="text-sm text-slate-600">{{ confirmState.text }}</p>
+        <div class="flex justify-end gap-2">
+          <button class="secondary-btn" :disabled="confirmState.loading" @click="closeConfirm">Отмена</button>
+          <button class="danger-btn" :disabled="confirmState.loading" @click="runConfirm">
+            {{ confirmState.loading ? "Выполняем..." : "Подтвердить" }}
+          </button>
         </div>
-        <button class="primary-btn xl:col-span-3" @click="createTab">Создать вкладку</button>
       </div>
-
-      <div class="overflow-x-auto">
-        <table class="min-w-full border-collapse text-sm">
-          <thead>
-            <tr class="border-b border-slate-200 text-left">
-              <th class="p-2">Название</th>
-              <th class="p-2">Route</th>
-              <th class="p-2">Представление</th>
-              <th class="p-2">Порядок</th>
-              <th class="p-2">Включена</th>
-              <th class="p-2">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="tab in data.tabs" :key="tab.id" class="border-b border-slate-100">
-              <td class="p-2">
-                <input
-                  class="field !min-h-9 !py-1 text-xs"
-                  :value="tab.название"
-                  :disabled="!data.can_write"
-                  @change="updateTab(tab.id, { title: $event.target.value })"
-                />
-              </td>
-              <td class="p-2">
-                <input
-                  class="field !min-h-9 !py-1 text-xs"
-                  :value="tab.route"
-                  :disabled="!data.can_write"
-                  @change="updateTab(tab.id, { route: $event.target.value })"
-                />
-              </td>
-              <td class="p-2">
-                <select
-                  class="field !min-h-9 !py-1 text-xs"
-                  :value="tab.db_view_name || ''"
-                  :disabled="!data.can_write"
-                  @change="updateTab(tab.id, { db_view_name: $event.target.value || null })"
-                >
-                  <option value="">Без представления</option>
-                  <option v-for="viewName in data.views" :key="viewName" :value="viewName">{{ viewName }}</option>
-                </select>
-              </td>
-              <td class="p-2">
-                <input
-                  class="field !min-h-9 !py-1 text-xs"
-                  type="number"
-                  :value="tab.порядок"
-                  :disabled="!data.can_write"
-                  @change="updateTab(tab.id, { sort_order: Number($event.target.value) })"
-                />
-              </td>
-              <td class="p-2">
-                <label class="flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    :checked="tab.включена"
-                    :disabled="!data.can_write"
-                    @change="updateTab(tab.id, { is_enabled: $event.target.checked })"
-                  />
-                  {{ tab.включена ? "Да" : "Нет" }}
-                </label>
-              </td>
-              <td class="p-2">
-                <button class="danger-btn !min-h-8 !px-2 text-xs" :disabled="!data.can_write" @click="deleteTab(tab.id)">
-                  Удалить
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </article>
+    </div>
   </section>
 </template>
 

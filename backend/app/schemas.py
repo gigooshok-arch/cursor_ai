@@ -66,8 +66,18 @@ class AccountCreateRequest(BaseModel):
 
 
 class AccountUpdateRequest(BaseModel):
+    login: str | None = Field(default=None, min_length=2, max_length=128)
+    employee_full_name: str | None = Field(default=None, min_length=2, max_length=255)
     role_id: int | None = Field(default=None, gt=0)
     is_blocked: bool | None = None
+
+    @field_validator("login", "employee_full_name")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped if stripped else None
 
 
 class RoleCreateRequest(BaseModel):

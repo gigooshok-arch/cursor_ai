@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 
 import api from "../api";
 import { setSession } from "../session";
+import { themeToggleLabel, toggleTheme } from "../theme";
 
 const router = useRouter();
 const login = ref("");
@@ -53,6 +54,9 @@ async function submit() {
 
 <template>
   <div class="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+    <button class="secondary-btn fixed right-3 top-3 !min-h-9 !px-3 !text-xs" @click="toggleTheme">
+      {{ themeToggleLabel }}
+    </button>
     <div class="card w-full max-w-md space-y-4">
       <div>
         <h1 class="page-title">Авторизация</h1>
