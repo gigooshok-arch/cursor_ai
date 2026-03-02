@@ -13,11 +13,19 @@ from app.main import app  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def cleanup_test_db() -> None:
+    uploads_dir = Path(__file__).resolve().parents[1] / "uploads" / "photos"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    for file_path in uploads_dir.glob("*"):
+        if file_path.is_file():
+            file_path.unlink()
     for suffix in ("", "-wal", "-shm"):
         target = Path(f"{TEST_DB_PATH}{suffix}")
         if target.exists():
             target.unlink()
     yield
+    for file_path in uploads_dir.glob("*"):
+        if file_path.is_file():
+            file_path.unlink()
     for suffix in ("", "-wal", "-shm"):
         target = Path(f"{TEST_DB_PATH}{suffix}")
         if target.exists():
@@ -180,4 +188,27 @@ def test_admin_can_edit_login_and_fio_with_unique_login_constraint(client: TestC
     refreshed = next(row for row in refreshed_accounts if row["id"] == first["id"])
     assert refreshed["логин"] == "admin_unique_test"
     assert refreshed["сотрудник_фио"] == "Тестов Тест Тестович"
+
+
+def test_admin_can_upload_account_photo(client: TestClient) -> None:
+    headers = auth_headers(client, "tymchenko_av", "admin123")
+    bootstrap = client.get("/api/admin/bootstrap", headers=headers)
+    assert bootstrap.status_code == 200
+    accounts = bootstrap.json()["данные"]["аккаунты"]
+    target = accounts[1]
+
+    photo_upload = client.post(
+        f"/api/admin/accounts/{target['id']}/photo",
+        headers=headers,
+        files={"photo": ("test_avatar.png", b"fake-image-content", "image/png")},
+    )
+    assert photo_upload.status_code == 200
+    photo_url = photo_upload.json()["данные"]["photo_url"]
+    assert photo_url.startswith("/uploads/photos/")
+
+    refresh = client.get("/api/admin/bootstrap", headers=headers)
+    assert refresh.status_code == 200
+    refreshed_accounts = refresh.json()["данные"]["аккаунты"]
+    refreshed = next(row for row in refreshed_accounts if row["id"] == target["id"])
+    assert refreshed["фото"] == photo_url
 

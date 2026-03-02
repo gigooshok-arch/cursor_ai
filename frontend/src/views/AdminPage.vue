@@ -6,6 +6,8 @@ import api from "../api";
 const loading = ref(false);
 const errorText = ref("");
 const subTab = ref("access");
+const accountSearch = ref("");
+const uploadingPhotoId = ref(null);
 
 const data = reactive({
   can_write: false,
@@ -32,6 +34,8 @@ const confirmState = reactive({
   text: "",
   action: null,
   loading: false,
+  confirmText: "Подтвердить",
+  danger: true,
 });
 
 const permissionOptions = [
@@ -40,12 +44,44 @@ const permissionOptions = [
   { value: "WRITE", label: "Запись" },
 ];
 
+const canCreateAccount = computed(() => {
+  return (
+    data.can_write &&
+    Boolean(accountCreateForm.employee_id) &&
+    Boolean(accountCreateForm.role_id) &&
+    (accountCreateForm.password || "").trim().length >= 3
+  );
+});
+
+const canCreateRole = computed(() => data.can_write && roleCreateForm.name.trim().length >= 2);
+
 const permissionMap = computed(() => {
   const map = new Map();
   for (const row of data.permissionMatrix) {
     map.set(`${row.role_id}:${row.tab_id}`, row.access);
   }
   return map;
+});
+
+const filteredAccounts = computed(() => {
+  const needle = accountSearch.value.trim().toLowerCase();
+  if (!needle) {
+    return data.accounts;
+  }
+  return data.accounts.filter((row) => {
+    const bag = [
+      row.логин,
+      row.сотрудник_фио,
+      row.роль,
+      row.роль_код,
+      row.заблокирован ? "заблокирован" : "активен",
+      row.нужна_смена_пароля ? "нужна смена пароля" : "пароль актуален",
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return bag.includes(needle);
+  });
 });
 
 function tabAccess(roleId, tabId) {
@@ -62,7 +98,22 @@ function normalizeAccountRow(row) {
     логин: row.логин || "",
     сотрудник_фио: row.сотрудник_фио || "",
     роль_id: row.роль_id,
+    фото: row.фото || "",
   };
+}
+
+function initials(fullName) {
+  const pieces = (fullName || "")
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!pieces.length) {
+    return "?";
+  }
+  return pieces
+    .slice(0, 2)
+    .map((item) => item[0]?.toUpperCase() || "")
+    .join("");
 }
 
 async function loadAdminData() {
@@ -85,7 +136,7 @@ async function loadAdminData() {
 }
 
 async function createAccount() {
-  if (!data.can_write) return;
+  if (!canCreateAccount.value) return;
   try {
     await api.post("/admin/accounts", {
       employee_id: Number(accountCreateForm.employee_id),
@@ -101,25 +152,21 @@ async function createAccount() {
   }
 }
 
-async function saveAccount(row) {
-  if (!data.can_write) return;
-  try {
-    await api.patch(`/admin/accounts/${row.id}`, {
-      login: row.логин,
-      employee_full_name: row.сотрудник_фио,
-      role_id: Number(row.роль_id),
-    });
-    await loadAdminData();
-  } catch (error) {
-    setError(error, "Не удалось сохранить аккаунт.");
-  }
+async function saveAccountDirect(row) {
+  await api.patch(`/admin/accounts/${row.id}`, {
+    login: row.логин,
+    employee_full_name: row.сотрудник_фио,
+    role_id: Number(row.роль_id),
+  });
 }
 
-function openConfirm(title, text, action) {
+function openConfirm({ title, text, action, confirmText = "Подтвердить", danger = true }) {
   confirmState.open = true;
   confirmState.title = title;
   confirmState.text = text;
   confirmState.action = action;
+  confirmState.confirmText = confirmText;
+  confirmState.danger = danger;
 }
 
 function closeConfirm() {
@@ -128,56 +175,99 @@ function closeConfirm() {
   confirmState.title = "";
   confirmState.text = "";
   confirmState.action = null;
+  confirmState.confirmText = "Подтвердить";
+  confirmState.danger = true;
 }
 
 async function runConfirm() {
   if (!confirmState.action) return;
   confirmState.loading = true;
+  errorText.value = "";
   try {
     await confirmState.action();
     closeConfirm();
+  } catch (error) {
+    setError(error, "Не удалось выполнить действие.");
   } finally {
     confirmState.loading = false;
   }
 }
 
+function confirmSaveAccount(row) {
+  openConfirm({
+    title: "Сохранить изменения?",
+    text: `Применить изменения для аккаунта ${row.логин || "без логина"}?`,
+    action: async () => {
+      await saveAccountDirect(row);
+      await loadAdminData();
+    },
+    confirmText: "Сохранить",
+    danger: false,
+  });
+}
+
 function confirmBlockToggle(row) {
-  openConfirm(
-    row.заблокирован ? "Разблокировать аккаунт?" : "Заблокировать аккаунт?",
-    row.заблокирован
+  openConfirm({
+    title: row.заблокирован ? "Разблокировать аккаунт?" : "Заблокировать аккаунт?",
+    text: row.заблокирован
       ? `Разблокировать логин ${row.логин}?`
       : `Заблокировать логин ${row.логин}? Пользователь не сможет войти.`,
-    async () => {
+    action: async () => {
       await api.patch(`/admin/accounts/${row.id}`, { is_blocked: !row.заблокирован });
       await loadAdminData();
     },
-  );
+    confirmText: row.заблокирован ? "Разблокировать" : "Заблокировать",
+    danger: true,
+  });
 }
 
 function confirmResetPassword(row) {
-  openConfirm(
-    "Сбросить пароль?",
-    `Сбросить пароль для ${row.логин} на стандартный pas123 с обязательной сменой?`,
-    async () => {
+  openConfirm({
+    title: "Сменить пароль?",
+    text: `Сбросить пароль для ${row.логин} на стандартный pas123 с обязательной сменой?`,
+    action: async () => {
       await api.post(`/admin/accounts/${row.id}/reset-password`);
       await loadAdminData();
     },
-  );
+    confirmText: "Сбросить",
+    danger: false,
+  });
 }
 
 function confirmDeleteAccount(row) {
-  openConfirm(
-    "Удалить аккаунт?",
-    `Удалить аккаунт ${row.логин}? Действие необратимо.`,
-    async () => {
+  openConfirm({
+    title: "Удалить аккаунт?",
+    text: `Удалить аккаунт ${row.логин}? Действие необратимо.`,
+    action: async () => {
       await api.delete(`/admin/accounts/${row.id}`);
       await loadAdminData();
     },
-  );
+    confirmText: "Удалить",
+    danger: true,
+  });
+}
+
+async function uploadPhoto(event, row) {
+  if (!data.can_write) return;
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+
+  uploadingPhotoId.value = row.id;
+  try {
+    const formData = new FormData();
+    formData.append("photo", file);
+    await api.post(`/admin/accounts/${row.id}/photo`, formData);
+    await loadAdminData();
+  } catch (error) {
+    setError(error, "Не удалось загрузить фотографию.");
+  } finally {
+    uploadingPhotoId.value = null;
+  }
 }
 
 async function createRole() {
-  if (!data.can_write || !roleCreateForm.name.trim()) return;
+  if (!canCreateRole.value) return;
   try {
     await api.post("/admin/roles", {
       name: roleCreateForm.name.trim(),
@@ -229,22 +319,28 @@ onMounted(loadAdminData);
   <section class="space-y-4">
     <header>
       <h1 class="page-title">Администрирование</h1>
-      <p class="mt-2 text-sm text-slate-600">
-        Управление доступом и ролями.
-      </p>
+      <p class="mt-2 text-sm text-slate-600">Управление доступом и ролями.</p>
     </header>
 
     <div class="card flex flex-wrap gap-2">
       <button
         class="secondary-btn"
-        :class="subTab === 'access' ? '!bg-slate-900 !text-white' : ''"
+        :class="
+          subTab === 'access'
+            ? '!bg-blue-600 !text-white ring-2 ring-blue-300 shadow-lg shadow-blue-300/35'
+            : ''
+        "
         @click="subTab = 'access'"
       >
         Управление доступом
       </button>
       <button
         class="secondary-btn"
-        :class="subTab === 'roles' ? '!bg-slate-900 !text-white' : ''"
+        :class="
+          subTab === 'roles'
+            ? '!bg-blue-600 !text-white ring-2 ring-blue-300 shadow-lg shadow-blue-300/35'
+            : ''
+        "
         @click="subTab = 'roles'"
       >
         Управление ролями
@@ -259,7 +355,7 @@ onMounted(loadAdminData);
     <article v-if="subTab === 'access'" class="card space-y-4">
       <h2 class="text-lg font-semibold">Таблица аккаунтов</h2>
 
-      <div v-if="data.can_write" class="grid gap-2 xl:grid-cols-4">
+      <div class="grid gap-2 xl:grid-cols-4">
         <select v-model="accountCreateForm.employee_id" class="field">
           <option value="">Выберите сотрудника</option>
           <option v-for="employee in data.employeesWithoutAccount" :key="employee.id" :value="employee.id">
@@ -273,7 +369,18 @@ onMounted(loadAdminData);
           </option>
         </select>
         <input v-model="accountCreateForm.password" class="field" placeholder="Пароль (по умолчанию pas123)" />
-        <button class="primary-btn" @click="createAccount">Добавить аккаунт</button>
+        <button class="primary-btn" :disabled="!canCreateAccount" @click="createAccount">Добавить аккаунт</button>
+      </div>
+
+      <div class="grid gap-2 md:grid-cols-[1fr_auto]">
+        <input
+          v-model="accountSearch"
+          class="field"
+          placeholder="Поиск по логину, ФИО, роли, статусу... (фильтрация в реальном времени)"
+        />
+        <div class="flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-sm">
+          Найдено: {{ filteredAccounts.length }}
+        </div>
       </div>
 
       <div class="overflow-x-auto">
@@ -289,16 +396,44 @@ onMounted(loadAdminData);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in data.accounts" :key="item.id" class="border-b border-slate-100">
+            <tr v-for="item in filteredAccounts" :key="item.id" class="border-b border-slate-100">
               <td class="p-2">
                 <input v-model="item.логин" class="field !min-h-9 !py-1 text-xs" :disabled="!data.can_write" />
               </td>
               <td class="p-2">
-                <input
-                  v-model="item.сотрудник_фио"
-                  class="field !min-h-9 !py-1 text-xs"
-                  :disabled="!data.can_write"
-                />
+                <div class="flex items-center gap-2">
+                  <label class="relative shrink-0 cursor-pointer">
+                    <input
+                      type="file"
+                      class="hidden"
+                      accept="image/*"
+                      :disabled="!data.can_write || uploadingPhotoId === item.id"
+                      @change="uploadPhoto($event, item)"
+                    />
+                    <img
+                      v-if="item.фото"
+                      :src="item.фото"
+                      :alt="item.сотрудник_фио"
+                      class="h-9 w-9 rounded-full border border-slate-300 object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-[11px] font-semibold"
+                    >
+                      {{ initials(item.сотрудник_фио) }}
+                    </div>
+                    <span
+                      class="absolute -bottom-1 -right-1 rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white"
+                    >
+                      +
+                    </span>
+                  </label>
+                  <input
+                    v-model="item.сотрудник_фио"
+                    class="field !min-h-9 !py-1 text-xs"
+                    :disabled="!data.can_write"
+                  />
+                </div>
               </td>
               <td class="p-2">
                 <select v-model="item.роль_id" class="field !min-h-9 !py-1 text-xs" :disabled="!data.can_write">
@@ -312,29 +447,17 @@ onMounted(loadAdminData);
               </td>
               <td class="p-2">{{ item.нужна_смена_пароля ? "Да" : "Нет" }}</td>
               <td class="p-2">
-                <div class="flex flex-wrap gap-1">
-                  <button class="secondary-btn !min-h-8 !px-2 text-xs" :disabled="!data.can_write" @click="saveAccount(item)">
+                <div class="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+                  <button class="secondary-btn mini-btn" :disabled="!data.can_write" @click="confirmSaveAccount(item)">
                     Сохранить
                   </button>
-                  <button
-                    class="secondary-btn !min-h-8 !px-2 text-xs"
-                    :disabled="!data.can_write"
-                    @click="confirmBlockToggle(item)"
-                  >
+                  <button class="secondary-btn mini-btn" :disabled="!data.can_write" @click="confirmBlockToggle(item)">
                     {{ item.заблокирован ? "Разблокировать" : "Заблокировать" }}
                   </button>
-                  <button
-                    class="secondary-btn !min-h-8 !px-2 text-xs"
-                    :disabled="!data.can_write"
-                    @click="confirmResetPassword(item)"
-                  >
-                    Сбросить пароль
+                  <button class="secondary-btn mini-btn" :disabled="!data.can_write" @click="confirmResetPassword(item)">
+                    Сменить пароль
                   </button>
-                  <button
-                    class="danger-btn !min-h-8 !px-2 text-xs"
-                    :disabled="!data.can_write"
-                    @click="confirmDeleteAccount(item)"
-                  >
+                  <button class="danger-btn mini-btn" :disabled="!data.can_write" @click="confirmDeleteAccount(item)">
                     Удалить
                   </button>
                 </div>
@@ -347,9 +470,9 @@ onMounted(loadAdminData);
 
     <article v-if="subTab === 'roles'" class="card space-y-4">
       <h2 class="text-lg font-semibold">Таблица ролей</h2>
-      <div v-if="data.can_write" class="grid gap-2 md:grid-cols-[1fr_auto]">
+      <div class="grid gap-2 md:grid-cols-[1fr_auto]">
         <input v-model="roleCreateForm.name" class="field" placeholder="Название новой роли" />
-        <button class="primary-btn" @click="createRole">Добавить роль</button>
+        <button class="primary-btn" :disabled="!canCreateRole" @click="createRole">Добавить роль</button>
       </div>
 
       <div class="space-y-3">
@@ -369,18 +492,10 @@ onMounted(loadAdminData);
             <span class="rounded-full border border-slate-300 px-2 py-1 text-xs">
               {{ role.заблокирована ? "Заблокирована" : "Активна" }}
             </span>
-            <button
-              class="secondary-btn !min-h-8 !px-2 text-xs"
-              :disabled="!data.can_write"
-              @click="updateRole(role.id, { is_blocked: !role.заблокирована })"
-            >
+            <button class="secondary-btn mini-btn" :disabled="!data.can_write" @click="updateRole(role.id, { is_blocked: !role.заблокирована })">
               {{ role.заблокирована ? "Разблокировать" : "Заблокировать" }}
             </button>
-            <button
-              class="danger-btn !min-h-8 !px-2 text-xs"
-              :disabled="!data.can_write || role.системная"
-              @click="deleteRole(role.id)"
-            >
+            <button class="danger-btn mini-btn" :disabled="!data.can_write || role.системная" @click="deleteRole(role.id)">
               Удалить роль
             </button>
           </div>
@@ -414,8 +529,12 @@ onMounted(loadAdminData);
         <p class="text-sm text-slate-600">{{ confirmState.text }}</p>
         <div class="flex justify-end gap-2">
           <button class="secondary-btn" :disabled="confirmState.loading" @click="closeConfirm">Отмена</button>
-          <button class="danger-btn" :disabled="confirmState.loading" @click="runConfirm">
-            {{ confirmState.loading ? "Выполняем..." : "Подтвердить" }}
+          <button
+            :class="confirmState.danger ? 'danger-btn' : 'primary-btn'"
+            :disabled="confirmState.loading"
+            @click="runConfirm"
+          >
+            {{ confirmState.loading ? "Выполняем..." : confirmState.confirmText }}
           </button>
         </div>
       </div>

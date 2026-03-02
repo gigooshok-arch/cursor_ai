@@ -4,7 +4,6 @@ import { RouterView, useRoute, useRouter } from "vue-router";
 
 import api from "../api";
 import { clearSession, sessionState, setSession } from "../session";
-import { themeToggleLabel, toggleTheme } from "../theme";
 
 const route = useRoute();
 const router = useRouter();
@@ -95,14 +94,9 @@ watch(
           </p>
           <p class="truncate text-xs text-slate-600">Ваша роль: {{ roleName }}</p>
         </div>
-        <div class="flex items-center gap-2">
-          <button class="secondary-btn !min-h-9 !px-2 !text-xs" @click="toggleTheme">
-            {{ themeToggleLabel }}
-          </button>
-          <button class="secondary-btn !px-3" @click="mobileOpen = !mobileOpen">
-            {{ mobileOpen ? "Закрыть" : "Меню" }}
-          </button>
-        </div>
+        <button class="secondary-btn !px-3" @click="mobileOpen = !mobileOpen">
+          {{ mobileOpen ? "Закрыть" : "Меню" }}
+        </button>
       </div>
     </header>
 
@@ -115,9 +109,6 @@ watch(
           <p class="text-sm font-semibold">
             {{ greetingText || `Привет, ${userName}. Ваша роль: ${roleName}` }}
           </p>
-          <button class="secondary-btn mt-3 w-full !min-h-9 !text-xs" @click="toggleTheme">
-            {{ themeToggleLabel }}
-          </button>
         </div>
 
         <p v-if="loadingNav" class="mb-2 text-xs text-slate-500">Загрузка навигации...</p>
@@ -136,7 +127,7 @@ watch(
             class="flex w-full min-h-11 items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium"
             :class="
               route.path.startsWith(item.route)
-                ? 'bg-slate-900 text-white'
+                ? 'bg-blue-600 text-white ring-2 ring-blue-300 shadow-lg shadow-blue-300/35'
                 : 'bg-white text-slate-700 hover:bg-slate-100'
             "
             @click="

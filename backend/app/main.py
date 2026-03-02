@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Literal
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -65,6 +68,19 @@ app = FastAPI(
     version="2.1.0",
 )
 
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+UPLOADS_DIR = BACKEND_DIR / "uploads"
+UPLOADS_PHOTOS_DIR = UPLOADS_DIR / "photos"
+UPLOADS_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+CONTENT_TYPE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -72,6 +88,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 ACCESS_RANK = {
     AccessLevel.HIDDEN: 0,
@@ -362,6 +379,7 @@ def admin_bootstrap(
                     "логин": item.login,
                     "сотрудник_id": item.employee_id,
                     "сотрудник_фио": item.employee.full_name,
+                    "фото": item.employee.photo,
                     "роль_id": item.role_id,
                     "роль": role_display_name(item.role.code, item.role.name),
                     "роль_код": item.role.code,
@@ -526,6 +544,40 @@ def admin_reset_password(
     target.force_password_change = True
     db.commit()
     return envelope("Пароль сброшен на стандартный.", {"временный_пароль": "pas123"})
+
+
+@app.post(f"{settings.api_prefix}/admin/accounts/{{account_id}}/photo")
+async def admin_upload_photo(
+    account_id: int,
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> dict[str, Any]:
+    require_admin_write(db, account)
+    target = db.get(Account, account_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Аккаунт не найден.")
+    if photo.content_type is None or not photo.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Разрешены только изображения.")
+
+    file_ext = Path(photo.filename or "").suffix.lower()
+    if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+        file_ext = CONTENT_TYPE_EXTENSIONS.get(photo.content_type, ".jpg")
+
+    content = await photo.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Файл пустой.")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Размер фото не должен превышать 5 МБ.")
+
+    file_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:10]}{file_ext}"
+    save_path = UPLOADS_PHOTOS_DIR / file_name
+    save_path.write_bytes(content)
+
+    target.employee.photo = f"/uploads/photos/{file_name}"
+    db.commit()
+
+    return envelope("Фото пользователя обновлено.", {"photo_url": target.employee.photo})
 
 
 @app.post(f"{settings.api_prefix}/admin/roles")

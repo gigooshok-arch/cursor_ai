@@ -25,3 +25,4 @@ tsconfig.tsbuildinfo
 *.sqlite3-shm
 *.sqlite3-wal
 backend/.pytest_cache/
+backend/uploads/

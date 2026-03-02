@@ -1,4 +1,4 @@
-import { computed, reactive } from "vue";
+import { reactive } from "vue";
 
 const STORAGE_KEY = "erp_rassvet_theme";
 
@@ -31,7 +31,4 @@ export function initTheme() {
   setTheme(prefersDark ? "dark" : "light");
 }
 
-export const themeToggleLabel = computed(() =>
-  themeState.mode === "dark" ? "Светлая тема" : "Темная тема",
-);
 
