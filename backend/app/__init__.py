@@ -1,0 +1,2 @@
+"""ERP-Rassvet backend package."""
+
