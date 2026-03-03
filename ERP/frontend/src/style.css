@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.card {
+  border-radius: 0.9rem;
+  border: 1px solid #e2e8f0;
+  background: white;
+  padding: 1rem;
+}
+
+.primary-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    background-color 120ms ease;
+}
+
+.secondary-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.danger-btn {
+  min-height: 44px;
+  border-radius: 0.6rem;
+  background: #be123c;
+  color: white;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    background-color 120ms ease;
+}
+
+.primary-btn:hover,
+.secondary-btn:hover,
+.danger-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 12%);
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.danger-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.mini-btn {
+  min-height: 32px;
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.field {
+  min-height: 44px;
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 0.55rem 0.75rem;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 6px 10px;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 10%);
+}
+
+.theme-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background-color 150ms ease;
+}
+
+.theme-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 25%);
+  transition: transform 150ms ease;
+}
+
+.theme-switch--on {
+  background: #2563eb;
+}
+
+.theme-switch--on .theme-switch-knob {
+  transform: translateX(20px);
+}
+
+body.theme-dark {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+body.theme-dark .card {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.theme-dark .field {
+  background: #0b1220;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+body.theme-dark .field::placeholder {
+  color: #94a3b8;
+}
+
+body.theme-dark .secondary-btn {
+  background: #0f172a;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+body.theme-dark .primary-btn {
+  background: #1d4ed8;
+}
+
+body.theme-dark .danger-btn {
+  background: #be123c;
+}
+
+body.theme-dark .bg-white {
+  background-color: #111827 !important;
+}
+
+body.theme-dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+body.theme-dark .bg-slate-100 {
+  background-color: #0b1220 !important;
+}
+
+body.theme-dark .bg-slate-950\/40 {
+  background-color: rgb(2 6 23 / 70%) !important;
+}
+
+body.theme-dark .border-slate-100,
+body.theme-dark .border-slate-200,
+body.theme-dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+body.theme-dark .text-slate-500,
+body.theme-dark .text-slate-600,
+body.theme-dark .text-slate-700,
+body.theme-dark .text-slate-900 {
+  color: #cbd5e1 !important;
+}
+
+body.theme-dark .text-sky-700 {
+  color: #93c5fd !important;
+}
+
+body.theme-dark .theme-toggle {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
